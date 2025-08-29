@@ -1,0 +1,18 @@
+## SSH — client & serveur (condensé)
+- Générer clé : `ssh-keygen` (suivre prompts)
+- Déployer clé : `ssh-copy-id user@host` (ajoute id_rsa.pub dans ~/.ssh/authorized_keys)
+- Permissions : ~/.ssh (700), authorized_keys (600)
+- Configs serveurs : /etc/ssh/sshd_config (options clés)
+  - `PermitRootLogin (yes | no | prohibit-password | forced-commands-only)`
+  - `PasswordAuthentication yes/no`
+  - `PubkeyAuthentication yes`
+  - `Port <n>`
+  - `MaxAuthTries` : number of allowed attempts
+  - `MaxSessions` : number of simultaneous sessions
+- Commandes utiles : `systemctl restart sshd` ; `ss -tuln | grep :22` ; `journalctl -u sshd`
+- Clients Windows courants : 
+	- OpenSSH intégré (Paramètres > Applications > Fonctionnalités facultatives)
+	- PuTTY, MobaXterm, mRemoteNG
+- Transferts : 
+	- CLI :`scp source dest` ou `sftp` 
+	- GUI : WinSCP (SCP/SFTP)
