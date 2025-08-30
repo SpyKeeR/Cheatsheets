@@ -1,6 +1,4 @@
-# CLI cmd.exe (DOS) — condensé et utile ⚙️
-
-
+# CLI cmd.exe (DOS) ⚙️
 
 ## Principes rapides
 - `help` ou `commande /?` → aide intégrée pour chaque commande.  
@@ -127,3 +125,4 @@
 - Privilège : teste d’abord en compte standard, puis élève si nécessaire. Toujours documenter opérations destructrices (`/MIR`, `rmdir /s`).  
 - Logs : ajoute toujours ` /LOG:` ou redirection `> log 2>&1` pour les tâches planifiées.  
 - Robocopy > xcopy pour fiabilité ; `robocopy` est ton ami pour sauvegardes.  
+
