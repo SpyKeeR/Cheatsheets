@@ -1,0 +1,136 @@
+# Sauvegarde & Restauration — Veritas / Veeam 
+
+## Outils
+- **Veritas Backup Exec** : UI centralisée (Accueil, Sauvegarde/Restauration, Moniteur, Stockage, Rapports). Flux : ajouter magasin → ajouter serveur → créer job de sauvegarde.
+- **Veeam Backup & Replication** : VM-focused (vSphere/Hyper-V), VSS support, sauvegarde image-level, restauration granulaire, réplication, Backup Copy, cloud & tape support.
+
+## Principales fonctions
+- Sauvegarde complète / différentielle / incrémentale (avantages/inconvénients rapides).  
+- Snapshots cohérents via VSS (application-aware) → sauvegarde d’AD/BDD cohérente.  
+- Restauration granulaire (fichiers, éléments d’application, GPO).  
+- Réplication (failover) vs Duplication (copie figée).  
+- Backup Copy → duplication régulière vers repo distant / cloud.  
+- Support tape pour archivage long terme / air-gap.
+
+## Principe 3-2-1-1-0
+- 3 copies, 2 types de supports, 1 hors-site, 1 copie isolée, 0 erreur de restauration.  
+- Sauvegarde locale rapide (disk/NAS/SAN) + offsite (cloud/site distant).
+- Ajouter 1 copie isolée (air-gapped / Object Lock) pour ransomware.  
+- Comptes dédiés (AD), groupe « Opérateur de sauvegarde », least privilege.  
+- Tests réguliers de restauration (valider RTO/RPO).
+
+## Plan de sauvegarde (doit inclure)
+- Périmètre (VM, BDD, fichiers, AD).  
+- Types & fréquences, rétentions.  
+- Supports (disk, NAS, SAN, tape, cloud).  
+- Workflow de restauration (file, VM, bare-metal, AD, BDD).  
+- Tests et rotation GFS (Daily/Weekly/Monthly).  
+- Procédure de destruction sécurisée des supports obsolètes.
+
+## Restauration
+- Fichier → restaurer sur l’origin ou emplacement alternatif (préférer alt).  
+- VM complète → restauration image / quick-restore.  
+- Bare-metal recovery → rebuild + image restore.  
+- AD : objets simples via Corbeille AD ; DC perdu → restauration image système cohérente + vérifier réplication.  
+- BDD : SQL via SSMS, MySQL via dump (`mysql --user=... --password=... < dump.sql`), Oracle via RMAN/datadump.  
+- Toujours isoler restauration AD/BDD et utiliser Application-Aware Processing.
+
+## Réplication vs Duplication
+- **Réplication** : copie synchronisée (RTO court), nécessite stockage accessible sur hôtes cibles ; ne pas démarrer manuellement un replica hors console.  
+- **Duplication** : copie figée, utile pour distribution/archivage.
+
+## Planification & supervision
+- Jobs planifiés + notifications mail (filtrer alertes critiques).  
+- Consoles : monitoring, rapports quotidiens, alerte en cas d’échec.  
+- Conserver logs et suivre tests de restauration.
+
+## Storage & protocoles recommandés
+- Utiliser SAN (iSCSI/FC) ou NAS selon besoin ; réserver réseau iSCSI (MTU 9000, redondance).  
+- VMFS / NFS pour datastores.  
+- Préférer adaptateurs physiques (HBA) pour perf sur SAN ; software initiator acceptable mais CPU-consommant.
+
+## Application-aware & cohérence
+- Activer Application-Aware Processing pour AD, SQL, Exchange → VSS snapshots cohérents.  
+- Compte de sauvegarde doit avoir droits nécessaires (mais limiter au minimum).
+
+## Snapshots
+- Snapshot = cliché instantané via VSS (consistency).  
+- Ne pas confondre avec snapshot hyperviseur (pas de cohérence app, impact perf, pas une sauvegarde).  
+- Utiliser snapshots hyperviseur pour tests/updates rapides, pas pour sauvegarde.
+
+## Tape & archivage long terme
+- Usage : archivage, air-gap, immutabilité.  
+- Planifier catalogue, étiquetage, rotation et destruction.
+
+## Tests & conformité
+- Tester restaurations (0 erreur idéal).  
+- Documenter procédures PCA (prévention continuité) vs PRA (restauration après incident).  
+- Conserver preuve des tests pour audits.
+
+## Rotation GFS (Grand-Father / Father / Son)
+- **Fils (quotidien)** 👶 : sauvegarde quotidienne, recyclée tous les 4 jours.  
+- **Père (hebdo)** 👨 : archive chaque fin de semaine, conservée ≈ 5 semaines.  
+- **Grand-Père (mensuel)** 👴 : archive fin de mois, conservée ≈ 12 mois.  
+- Exemple 5-jours → besoin ≈ 21 bandes/an (cycle expliqué → réutilisation hebdo/mensuelle).
+
+## Modes de sauvegarde
+- **Chaude (hot)** 🔥 : sauvegarde en cours d’utilisation (VSS/app-aware) — accès continu, +complexe, ressources élevées.  
+- **Froide (cold)** ❄️ : arrêt/lock fichiers pendant la sauvegarde — simple, interruption service.
+- **Snapshot** 📸 : cliché instantané (VSS) — rapide, cohérent, nécessite espace disque.
+
+## Bases de données — méthodes courantes (exemples)
+- **SQL Server** : sauvegarde via SSMS (GUI) ou scripts T-SQL.  
+- **MySQL** : dump SQL → `mysqldump -u username -p"password" [options] database > dump.sql`  
+- **Oracle** : RMAN → `rman target /` puis `backup incremental level 0 ... plus archivelog;`  
+- **Bonnes pratiques DB** : backups application-aware, comptes dédiés, test restauration, séparer logs / data.
+
+## Architecture logicielle & composants
+- Logiciel de sauvegarde (orchestrateur), ordonnanceur, stockage physique, catalogues / journaux.  
+- Types de stockage historiques → cartes perforées → bandes → HDD/SSD → NAS/SAN/cloud.
+
+## Supports & critères (très synthétique)
+- CD/DVD/Blu-ray : faible capacité.  
+- HDD : bon marché, sensible aux chocs.  
+- SSD : rapide, coûteux.  
+- Clé USB / cartes mémoire : pratique, fiabilité moyenne.  
+- Bande magnétique (LTO) : grande longévité, automatisable (robots).  
+- RDX : disque portable modulaire.  
+- NAS : partage fichier (SMB/NFS), RAID souvent intégré, saturable réseau.  
+- SAN : mode bloc (iSCSI/FC), hautes perf, complexe.  
+- Cloud : accessible, dépendant réseau, latence, coûts.
+
+**Choix selon** : capacité, fiabilité, temps RTO/RPO, coût, sécurité, conformité.
+
+## DAS / NAS / SAN (rappel / synthèse)
+- **DAS** : direct à serveur (simple, local).  
+- **NAS** : fichier sur réseau (CIFS/SMB/NFS), bon pour partages.  
+- **SAN** : bloc dédié (iSCSI/FC), meilleur perf pour serveurs/VMs critiques.
+
+## Classes de sauvegarde (accès/latence)
+- **Inline** : déduplication en temps réel pendant sauvegarde.  
+- **Online** : stockage actif, accès immédiat.  
+- **Near-line** : disque peu sollicité, accès rapide mais pas instantané.  
+- **Offline** : supports déconnectés (bandes) — air-gap possible.
+- **Archival** : stockage long terme, accès lent (cloud froid, bandes archivage).
+
+## RAID — synthèse (choisir selon perf vs sécurité)
+- RAID 0 : striping, perf, **pas** de redondance.  
+- RAID 1 : mirroring, tolérance (capacité ÷2).  
+- RAID 5/6 : striping + parité (3+ disques), bon compromis; RAID6 tolère 2 pannes.  
+- RAID 10 : mirroring + striping, perf + redondance (capacité ÷2).
+
+**Matériel vs logiciel** : matériel = +perf/fiable; logiciel = +flexible/moins cher.
+
+## Stratégie recommandées
+- Appliquer règle **3-2-1** (+ air-gap si possible).  
+- Séparer sauvegarde locale / offsite (cloud ou site distant).  
+- Dédier comptes & groupes (ex : Opérateur sauvegarde).  
+- Activer Application-Aware (VSS/RMAN) pour AD/BDD.  
+- Planifier GFS + tests de restauration réguliers (documentés).  
+- Choisir supports selon RTO/RPO, coût, sécurité et conformité.
+
+## Points opérationnels rapides
+- Automatiser via ordonnanceur, surveiller logs & alertes, filtrer notifications.  
+- Cataloguer supports (bandes) & gérer rotation physique.  
+- Valider immutabilité/retention (cloud Object Lock / WORM bandes) pour ransomware.
+- Documenter procédures PCA/PRA, conserver preuves tests pour audits.
