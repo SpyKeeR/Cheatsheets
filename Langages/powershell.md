@@ -1,250 +1,586 @@
-# PowerShell — Cheatsheet
+# ⚡ PowerShell — Aide-mémoire
 
-## Concepts PowerShell
-- Propriétés = caractéristiques d’un objet (ex : taille fichier).
-- Méthodes = actions (ex : Rename(), Stop()).
-- `Get-Member` → lister méthodes/propriétés : `Get-Content | Get-Member`
-- `$PSVersionTable` → info version PowerShell.
-- Structure nommage : `Verbe-Nom` (Get, Set, New, Remove, Add).
-- `Get-Command` → lister commandes
-	- `Get-Command -CommandType Cmdlet` → uniquement cmdlets.
-	- `-Name`, `-Verb`, `-Noun` → Options de filtrage
-- `Get-Alias`, `Get-Verb` → utilitaires pour discovery.
-- PowerShell Core ≠ PowerShell Windows (No WMI/CIM, No Remoting, No scheduling mgmt et moins d'alias)
+## 🏗️ Concepts Fondamentaux
 
+### Philosophy & Architecture
+- **Objets** : PowerShell manipule des objets .NET (pas du texte brut)
+- **Pipeline** : Transmission d'objets entre cmdlets (préservation type/propriétés)
+- **Nommage** : Convention `Verbe-Nom` (Get-Process, Set-Location)
+- **Versions** : Windows PowerShell 5.1 vs PowerShell Core 7+ (cross-platform)
 
-## Recherche & aide
-- `Get-Command` → trouver cmdlet/fonction/alias/script. Ex : `Get-Command -Name *service` ou `Get-Command -Verb Get`
-- `Get-Help <Cmdlet>` → aide (description + paramètres)
-  - `-Full` → aide complète  
-  - `-Examples` → exemples seulement  
-  - `-Online` → ouvre la doc Microsoft  
-  - `-ShowWindow` → fenêtre GUI d'aide
-- `Get-Help about_Variables` ⇒ Fiches informatives concepts PSH commençant par about_
-- Mettre à jour l’aide : `Update-Help` ; `-UICulture fr-FR` ➜ obtenir version française
-- Offline help : `Save-Help -DestinationPath D:\HelpOffline` puis `Update-Help -SourcePath D:\HelpOffline`
+### Structure Objet
+```powershell
+# Propriétés = caractéristiques (taille, nom, statut)
+$process = Get-Process notepad
+$process.Name                    # Accès propriété
+$process.ProcessName            # Autre propriété
 
+# Méthodes = actions (Stop(), Kill(), Refresh())
+$process.Kill()                 # Appel méthode
+(Get-Date).AddDays(2)          # Méthode avec paramètre
 
-## Modules
-- Lister modules chargés : `Get-Module`
-- Lister modules disponibles : `Get-Module -ListAvailable`
-- Chemins modules : `$env:PSModulePath`
-- Installer/poser un module : déposer .PSM1 dans un des chemins et `Import-Module NomDuModule`
-- Vérifier import : `Get-Command -Module NomDuModule`
+# Introspection complète
+Get-Process | Get-Member        # Liste propriétés/méthodes
+$var.GetType()                  # Type de variable
+```
 
+## 🔍 Discovery & Aide
 
-## Profil utilisateur
-- Créer profil si absent : `New-Item -Path $Profile -Type File -Force`
-- Éditer : `notepad $Profile`
-- Exemples utiles dans $Profile : 
-	```powershell
-	Import-Module ActiveDirectory
-	Set-Location C:\Scripts
-	Write-Host "Bienvenue Maxime 👋"
-	Set-Alias ll Get-ChildItem
-	```
+### Exploration Commandes
+```powershell
+# Recherche cmdlets
+Get-Command                     # Toutes commandes
+Get-Command -Verb Get          # Par verbe
+Get-Command -Noun Service      # Par nom
+Get-Command *service*          # Pattern matching
+Get-Command -CommandType Cmdlet # Types spécifiques
 
+# Verbes disponibles
+Get-Verb                       # Verbes approuvés
+Get-Alias                      # Alias système
+```
 
-## Objets & introspection
-- PowerShell manipule des objets (propriétés + méthodes) — pas du texte brut.
-- Voir propriétés/méthodes : `Get-Process | Get-Member` (🚫 éviter sur les cmdlets Set-)
-- Appel méthode : `(Get-Date).AddDays(2)` → ajoute 2 jours
-	- Les méthodes attendent des types de variables précis.
-	- Les méthodes ToType() (ex: .ToInt16()) servent à convertir un type en un autre.
-- Accès propriété : `(Get-Date).Year` → propriété Year
+### Système d'Aide
+```powershell
+# Aide contextuelle
+Get-Help Get-Process           # Aide basique
+Get-Help Get-Process -Full     # Aide complète
+Get-Help Get-Process -Examples # Exemples seulement
+Get-Help Get-Process -Online   # Documentation web
+Get-Help Get-Process -ShowWindow # Fenêtre GUI
 
+# Aide conceptuelle
+Get-Help about_Variables       # Concepts PowerShell
+Get-Help about_*              # Tous sujets about
 
-## Variables & portée
-- Déclaration : `$Nom = Valeur` (typage automatique).  
-- Forcer type : `[int]$n = 1`, `[string]$s = "txt"`.  
-- Portées : `$global:var`, `$script:var`.  
-- Lister : `Get-Variable`.  
-- Type : `$var.GetType()` ; inspecter objets : `| Get-Member`.
+# Gestion aide hors-ligne
+Update-Help                    # Télécharger aide
+Update-Help -UICulture fr-FR   # Langue française
+Save-Help -DestinationPath C:\Help  # Aide portable
+```
 
+## 📦 Modules & Profils
 
-## Types de variables
-- `String` → chaîne (`"texte"`) ; méthodes `.Length`, `.Replace()`, `.ToUpper()`.  
-- `Integer` → nombre (`1`) ; opérations + - \* / ; `.ToString()` ; `.Round(n)`.
-- `Bool` → `$true` / `$false`.  
-- `Object` → résultat d'une cmdlet (propriétés + méthodes).  
-- `Array` → `@("A","B")` (taille fixe, simple, performant. ; `$array += "C"` recrée le tableau).  
-- `ArrayList` → dynamique (ajouts/suppressions fréquents) : `$list = New-Object System.Collections.ArrayList` ; `.Add()`, `.Remove()`, `.Insert()`, `.RemoveAt()`.
+### Gestion Modules
+```powershell
+# Exploration modules
+Get-Module                     # Modules chargés
+Get-Module -ListAvailable      # Modules disponibles
+$env:PSModulePath             # Chemins recherche
 
+# Import/Export
+Import-Module ActiveDirectory  # Charger module
+Get-Command -Module AD*       # Commandes du module
+Remove-Module ActiveDirectory  # Décharger
 
-## Pipes & enchaînements
-- `|` → transmet objet au suivant (preserve object).
-	- Pipeline : commande1 | commande2  
-	- Objet courant dans pipeline : `$_` ou `$PSItem`
-- `;` → enchaîne commandes indépendantes.  
-- Continuer une ligne en dessous : backtick en fin de ligne du début
-- Commentaire : `#` (ligne) ; bloc `#< ... >#`.
+# Installation (PowerShell Gallery)
+Install-Module -Name Az        # Installer module
+Find-Module *Exchange*        # Rechercher modules
+```
 
+### Profils Utilisateur
+```powershell
+# Emplacements profils
+$PROFILE                      # Profil utilisateur courant
+$PROFILE.AllUsersCurrentHost  # Tous utilisateurs
+Test-Path $PROFILE           # Vérifier existence
 
-## Sélection / tri / agrégation
-- `Select-Object` (alias `Select`) → choisir propriétés, `-First n`, `-Last n`, `-Unique`, `-ExpandProperty`
-  - Ex : `Get-Service | Select Name,Status`
-  - Ex : `Get-Process | Select -First 5`
-- `Sort-Object` (alias `Sort`) → tri ; `-Descending` pour inverser
-  - Ex : `Get-ChildItem | Sort-Object Length -Descending`
-- `Measure-Object` - Calculs sur la sortie
-  - Ex : `Get-Process | Measure-Object -Property <NomProp> -Sum -Average -Minimum -Maximum`
+# Création/édition profil
+New-Item -Path $PROFILE -Type File -Force
+notepad $PROFILE             # Éditer profil
+```
 
+## 🔧 Variables & Types
 
-## Filtrage
-- Filtrer : `| Where-Object { $_.Propriete -eq 'Valeur' }`  
-	- Opérateurs simples : `-eq, -ne, -gt, -lt, -ge, -le, -like, -notlike` (versions sensibles casse : `-ceq`, `-cne` ...)
-	- Opérateurs complexes : Regex : `-match`, `-notmatch` | Valeur dans tableau : `-contains`, `-notcontains` | Valeur dans string : `-in`, `-notin`
-	- Combiner plusieurs conditions : `-and`, `-or` et blocs de conditions avec `()`
-- Exemples :
-  - `Get-Service | Where-Object { $_.Status -eq 'Running' }`
-  - `Get-ADUser -Filter * -Properties * | Where-Object { ($_.Name -like '*R*' -and $_.Enabled -eq $false) -or ($_.GivenName -like '*A*') }`
+### Types de Données
+| Type | Déclaration | Exemple | Méthodes Utiles |
+|------|-------------|---------|-----------------|
+| **String** | `[string]$s` | `"texte"` | `.Length`, `.ToUpper()`, `.Replace()` |
+| **Integer** | `[int]$n` | `42` | `.ToString()`, math ops |
+| **Boolean** | `[bool]$b` | `$true/$false` | Logical ops |
+| **Array** | `[array]$a` | `@(1,2,3)` | `.Count`, `+=` (recréé) |
+| **ArrayList** | Collections | `New-Object System.Collections.ArrayList` | `.Add()`, `.Remove()` |
+| **Hashtable** | `[hashtable]$h` | `@{key="value"}` | `.Keys`, `.Values` |
+| **DateTime** | `[datetime]$d` | `Get-Date` | `.AddDays()`, `.ToString()` |
 
+### Gestion Variables
+```powershell
+# Déclaration & typage
+$var = "valeur"               # Auto-détection type
+[int]$number = "42"           # Conversion forcée
+[string]$text = 123           # Cast en string
 
-## Mise en forme (affichage)
-- `Format-Table` (`ft`) → tableau 
-	- `-Property` ➜ Définir propriété(s)
-	- `-GroupBy` ➜ Regrouper par propriété
-	- `-Wrap` ➜ Force le retour à la ligne dans une celle pour afficher tout le contenu
-	- `-HideTableHeaders` ➜ Pas d'entête colomnes.
-- `Format-Wide` → une propriété, largeur de colomne configurable (`-Column n`, `-AutoSize`)
-- `Format-List` → liste verticale ; `Format-List *` pour toutes les propriétés
-- `Select -ExpandProperty <Prop>` → extraire valeur brute (utile pour scripts)
+# Portées (scopes)
+$global:var = "globale"       # Visible partout
+$script:var = "script"        # Script entier
+$local:var = "locale"         # Fonction courante
+$private:var = "privée"       # Scope actuel seulement
 
+# Utilitaires variables
+Get-Variable                  # Lister variables
+Get-Variable var*            # Pattern matching
+Remove-Variable -Name var    # Supprimer variable
+```
 
-## Flux & redirections
-- STDIN = 0 (clavier), STDOUT = 1 (sortie normale), STDERR = 2 (erreurs)  
-- Redirections courantes : `>` écrase, `>>` ajoute, `2>` erreurs, `2>>` ajoute erreurs, `2>&1` fusionne erreurs+sortie, `2> $null` supprime erreurs.
+### Tableaux & Collections
+```powershell
+# Array standard (immutable)
+$array = @("a", "b", "c")
+$array += "d"                # Recrée tableau entier
+$array[0]                    # Premier élément
+$array[-1]                   # Dernier élément
+$array.Count                 # Nombre éléments
 
+# ArrayList (mutable, performance)
+$list = New-Object System.Collections.ArrayList
+$list.Add("item")           # Ajouter
+$list.Remove("item")        # Supprimer
+$list.Insert(0, "first")    # Insérer position
 
-## Export / Import & formats
-- CSV : `Get-ADUser -Filter * | Export-Csv -Path "\\serveur\share\users.csv" -Delimiter ";" -NoTypeInformation`
-  - `-Path` → chemin (UNC recommandé)
-  - `-Delimiter` → séparateur (`;` ou `,`)
-  - `-NoTypeInformation` → supprime l'entête Microsoft
-  - `-Append` → ajouter au fichier existant
-- Lire CSV : `Import-Csv "chemin\fichier.csv" -Delimiter ";" | <pipeline>` (Entête deviennent des propriétés)
-- CliXML : `Export-CliXml` / `Import-CliXml` → XML préservant types PowerShell
-- JSON : `ConvertTo-Json | Out-File chemin.json` ; lire : `Get-Content chemin.json | ConvertFrom-Json`
-- HTML : `ConvertTo-Html | Out-File page.html` → rapport Web
-- XLSX : module `ImportExcel` (installation requise) → export direct en .xlsx
+# Hashtable (clé-valeur)
+$hash = @{
+    Name = "John"
+    Age = 30
+}
+$hash.Name                  # Accès valeur
+$hash.Keys                  # Toutes clés
+$hash["NewKey"] = "value"   # Ajouter élément
+```
 
+## 🔄 Pipeline & Traitement
 
-## Lecture/écriture brute
-- Lire fichier ligne par ligne : `Get-Content C:\fichier.txt`
-- `-Tail 10` → Lire dernier N lignes
-- `-wait` → Lire en temps réel 
-- `Out-File "C:\out.txt"` → écrit la sortie dans un fichier
-  - `-Append` → ajoute au fichier
-  - `-Width <n>` → limite largeur ligne (par défaut 80)
-- Exemple rapide : `Get-Service | Out-File "C:\ENI\Services.txt" -Width 120 -Append`
+### Opérateurs Pipeline
+```powershell
+# Pipeline objet
+Get-Process | Where-Object Name -eq "notepad"
+Get-Service | Sort-Object Status | Format-Table
 
+# Variables contextuelles
+$_          # Objet courant (legacy)
+$PSItem     # Objet courant (moderne, recommandé)
 
-## Propriété calculée (Select / Select-Object)
-- Syntaxe : `@{n='Nom';e={ <expression> }}` (ou `@{Name='Nom';Expression={...}}`)
-- Exemples :
-  - `Get-ChildItem -File | Select Name, @{n='Taille';e={[math]::Round($_.Length/1MB,2)}}`
-  - `Get-Volume | Select @{n='Lecteur';e={$_.DriveLetter}}, @{n='Taille';e={($_.Size/1GB).ToString("N2") + " GB"}}`
-- Utiliser pour formater/arrondir/concaténer avant export
+# Enchaînement commandes
+cmd1; cmd2; cmd3           # Séquentiel
+cmd1 && cmd2               # Si succès (PS 7+)
+cmd1 || cmd2               # Si échec (PS 7+)
+```
 
+### Filtrage & Sélection
+```powershell
+# Where-Object (filtrage)
+Get-Process | Where-Object {$_.CPU -gt 100}
+Get-Service | Where-Object Status -eq "Running"
+Get-ChildItem | Where-Object {$_.Name -like "*.txt" -and $_.Length -gt 1KB}
 
-## Contrôle : IF / SWITCH (cond.)
-- IF :  
-  - `if (condition) { ... } elseif (autre) { ... } else { ... }`
-  - Exemple : `if ($user.Enabled) { Write-Host "Actif" } else { Write-Host "Inactif" }`
-- SWITCH : valeur → plusieurs cas  
-  - `switch ($val) { "a" {..} "b" {..} default {..} }`
-  - Regex : `switch -regex ($var) { '\d' {..} }`
+# Opérateurs de comparaison
+-eq, -ne                   # Égal, différent
+-gt, -ge, -lt, -le        # Comparaisons numériques
+-like, -notlike           # Wildcards (* ?)
+-match, -notmatch         # Regex
+-contains, -notcontains   # Contient élément
+-in, -notin              # Élément dans collection
 
+# Select-Object (projection)
+Get-Process | Select-Object Name, CPU, Id
+Get-Service | Select-Object -First 5
+Get-ChildItem | Select-Object -ExpandProperty Name  # Valeur brute
+```
 
-## Boucles
-- WHILE (test avant) :
-  - `$x=1 ; while ($x -lt 10) { $x++; }`
-  - Nécessite initialisation `$x` avant
-- DO { } WHILE (test après, exécute au moins 1 fois) :
-  - `do { $x = Read-Host "Choix (Q pour quitter)"} while ($x -ne "q")`
-- DO { } UNTIL (inverse) :
-  - `do { ... } until ($x -eq "q")`
-- FOREACH (itération collection) :
-  - `foreach ($item in $collection) { ... }`
-  - Ex : `$users = Get-ADUser -Filter * ; foreach ($u in $users) { Write-Host $u.Name }`
-- Break / Continue :
-  - `break` → quitte la boucle immédiatement
-  - `continue` → saute l'itération courante
+### Tri & Mesures
+```powershell
+# Sort-Object
+Get-Process | Sort-Object CPU -Descending
+Get-ChildItem | Sort-Object Length, Name
 
+# Measure-Object (agrégation)
+Get-Process | Measure-Object CPU -Sum -Average -Maximum
+Get-ChildItem *.txt | Measure-Object Length -Sum
+```
 
-## Gestion des erreurs
-- `$Error` → tableau d'erreurs (dernier = `$Error[0]`).  
-- Cmdlet-level/Violation : `-ErrorAction Continue|SilentlyContinue|Ignore|Stop|Inquire|Suspend`
-	- Continue : affiche l’erreur et continue (valeur par défaut)
-	- SilentlyContinue : ignore l’affichage, mais stocke l’erreur dans $Error
-	- Ignore : ne fait rien, n’enregistre pas l’erreur
-	- Stop : stoppe immédiatement l’exécution
-	- Inquire : demande à l’utilisateur quoi faire
-	- Suspend : suspend un workflow en cours;
-- `-ErrorVariable nomVar` → Stockage erreur dans nomVar
-- Définir violation au Global : `$ErrorActionPreference = "Stop"`  
-- Structure :  
-  - `try { ... } catch { ... } finally { ... }`  
-  - `finally` s'exécute toujours (cleanup).
+## 💾 Import/Export & Formats
 
+### Formats de Données
+```powershell
+# CSV (Excel compatible)
+Get-Process | Export-Csv "processes.csv" -NoTypeInformation -Delimiter ";"
+Import-Csv "data.csv" -Delimiter ";" | Where-Object Status -eq "Active"
 
-## Fonctions (mini)
-- Syntaxe : 
-	```powershell
-	function Nom {
-		param($p1, [Parameter(Mandatory=$true)][int]$p2)
-		$p3 = $p1 + $p2
-		return $p3
-	}
-	```	
-- Retour : `return` ou sortie d'objet.  
-- Exemple : `function Add($a,$b){ return $a+$b }` → `$r = Add 1 2`.
+# JSON (APIs/configs)
+Get-Service | ConvertTo-Json | Out-File "services.json"
+Get-Content "config.json" | ConvertFrom-Json
 
+# XML PowerShell (préserve types)
+Get-Process | Export-Clixml "processes.xml"
+$data = Import-Clixml "processes.xml"
 
-## Remoting (WinRM / PSSession)
-- Activer cible : `Enable-PSRemoting -Force` (ouvre ports 5985 HTTP / 5986 HTTPS).  
-- Session interactive : `Enter-PSSession -ComputerName HOST` → `Exit-PSSession`.
-- Lister les sessions : `Get-PSSession` ; Quitter Session : `Exit-PSSession`
-- Reconnecter une session déconnectée : `Connect-PSSession -Session $session`
-- Commande distante ponctuelle : `Invoke-Command -ComputerName HOST -ScriptBlock { Get-Service }`  
-- Session persistante : 
-	```powershell
-	$session = New-PSSession -ComputerName DC01  
-	Invoke-Command -Session $session -ScriptBlock { Get-Service }  
-	Remove-PSSession -Session $session
-	```
-- Importer modules depuis session distante : `Import-PSSession -Session $s -Module ActiveDirectory -Prefix D`  
-- Multi-hôtes : `Invoke-Command -ComputerName A,B -ScriptBlock { ... }` 
-- Auth & délégation : CredSSP / Kerberos nécessaire pour délégation multi-sauts (A -> B -> C).
+# HTML (rapports)
+Get-EventLog -LogName System -Newest 10 | ConvertTo-Html | Out-File "report.html"
+```
 
+### Lecture/Écriture Fichiers
+```powershell
+# Lecture
+Get-Content "file.txt"        # Tout le fichier
+Get-Content "file.log" -Tail 20 -Wait  # Suivi temps réel
+Get-Content "big.log" | Select-Object -First 100
 
-## Get-Credential (identifiants sécurisés)
-- ` $cred = Get-Credential -Message "..." -UserName "DOM\user"` → objet `System.Management.Automation.PSCredential` (username + SecureString password).  
-- Usage : `Invoke-Command -ComputerName HOST -Credential $cred -ScriptBlock { ... }` ou `New-PSSession -Credential $cred`.
+# Écriture
+"Contenu" | Out-File "output.txt"
+"Ajout" | Add-Content "output.txt"
+Get-Process | Out-File "processes.txt" -Width 200
+```
 
-## Exécution de scripts
-- `Set-ExecutionPolicy -ExecutionPolicy <Level> -Scope <Scope>` → définit politique d’exécution
-	- Levels : 
-		- Restricted → Par défaut. Aucun script n’est autorisé
-		- AllSigned	→ Seulement les scripts signés sont exécutables
-		- RemoteSigned → Scripts locaux : OK / Scripts distants : signés
-		- Unrestricted → Tout peut s'exécuter (⚠️ Risqué)
-		- Bypass → Aucune restriction, pas même d'avertissement
-		- Default → Réinitialise selon le contexte (souvent Restricted)
-	- Scopes : MachinePolicy, UserPolicy, Process, LocalMachine (Default), CurrentUser
+## 🎯 Propriétés Calculées
 
+### Syntaxe & Exemples
+```powershell
+# Structure de base
+@{Name="NomColonne"; Expression={$_.Propriété}}
+@{N="Alias"; E={$_.Propriété}}  # Version courte
 
-## Bonnes pratiques rapides
-- Préférer objets lors du piping de commande 
-- Ne pas mélanger `Format-*` avant export/traitement.  
-- Tester `$PSVersionTable.PSVersion` pour compatibilité (WinPS 5.1 vs PS7+).  
-- Utiliser VSCode + extension PowerShell pour édition / debug.  
-- Préférer `Select-Object` (propriétés) avant `Export-Csv` pour définir colonnes et ordre.
-- Pour gros fichiers logs, `Get-Content -Tail` évite de charger tout le fichier.
-- Tester les expressions calculées sur un petit jeu (`Select -First 5`) avant export massif.
-- Utiliser UNC pour chemins partagés et vérifier droits écriture.
-- Utilise `Get-Command` → trouve cmdlets avant d’essayer ; `Get-Help -Examples` pour usage rapide.
-- `Get-Member` → indispensable pour savoir quoi tester dans `Where-Object`.
-- Toujours filtrer tôt (`Where-Object`) pour réduire charge ; préfèrer les paramètres natifs des cmdlets (ex : `Get-Process -Name foo`) quand possible.
-- `$_` est contextuel : lisibilité → préférer `$PSItem` dans scripts complexes.
-- Attention aux types : `Measure-Object` nécessite propriété numérique.
+# Exemples pratiques
+Get-ChildItem | Select-Object Name, @{N="SizeMB"; E={[math]::Round($_.Length/1MB, 2)}}
+
+Get-Process | Select-Object Name, @{
+    Name="MemoryMB"
+    Expression={[math]::Round($_.WorkingSet/1MB, 2)}
+}
+
+# Formatage avancé
+Get-Volume | Select-Object @{N="Drive"; E={$_.DriveLetter + ":"}}, 
+                          @{N="Size"; E={($_.Size/1GB).ToString("N2") + " GB"}}
+```
+
+## 🔀 Structures de Contrôle
+
+### Conditions
+```powershell
+# If/ElseIf/Else
+if ($condition) {
+    # Actions si vrai
+} elseif ($autre_condition) {
+    # Actions alternatives
+} else {
+    # Actions par défaut
+}
+
+# Switch (multi-conditions)
+switch ($variable) {
+    "value1" { "Action 1" }
+    "value2" { "Action 2" }
+    {$_ -gt 10} { "Supérieur à 10" }  # Script block
+    default { "Autre cas" }
+}
+
+# Switch avec regex
+switch -Regex ($text) {
+    '^\d+$' { "Nombre" }
+    '^[a-zA-Z]+$' { "Lettres seulement" }
+}
+```
+
+### Boucles
+```powershell
+# ForEach (collection)
+$services = Get-Service
+foreach ($service in $services) {
+    Write-Host $service.Name
+}
+
+# For (compteur)
+for ($i = 0; $i -lt 10; $i++) {
+    Write-Host "Iteration $i"
+}
+
+# While (condition avant)
+$counter = 0
+while ($counter -lt 5) {
+    $counter++
+}
+
+# Do-While (condition après, min 1 exécution)
+do {
+    $input = Read-Host "Entrez 'quit' pour sortir"
+} while ($input -ne "quit")
+
+# Do-Until (inverse de While)
+do {
+    $response = Invoke-WebRequest $url -TimeoutSec 5 -ErrorAction SilentlyContinue
+} until ($response.StatusCode -eq 200)
+```
+
+## 🎨 Formatage Affichage
+
+### Format-* Cmdlets
+```powershell
+# Format-Table (défaut pour la plupart)
+Get-Process | Format-Table Name, CPU, Id -AutoSize
+Get-Service | Format-Table -GroupBy Status
+Get-ChildItem | Format-Table -Property Name, Length -Wrap
+
+# Format-List (vertical, détaillé)
+Get-Process notepad | Format-List *  # Toutes propriétés
+Get-EventLog System -Newest 1 | Format-List
+
+# Format-Wide (colonnes, une propriété)
+Get-ChildItem | Format-Wide Name -Column 4
+Get-Process | Format-Wide -Property ProcessName -AutoSize
+```
+
+### Out-* Cmdlets
+```powershell
+# Destinations sortie
+Out-File "result.txt"         # Fichier texte
+Out-GridView                  # Fenêtre GUI interactive
+Out-Printer                   # Imprimante
+Out-Host                      # Console (défaut)
+Out-Null                      # Suppression sortie
+
+# Out-GridView avancé
+Get-Process | Out-GridView -Title "Processus" -PassThru | Stop-Process
+```
+
+## 🔐 Sécurité & Gestion Erreurs
+
+### Execution Policy
+```powershell
+# Vérifier politique actuelle
+Get-ExecutionPolicy -List
+
+# Niveaux de sécurité
+Set-ExecutionPolicy Restricted      # Aucun script (défaut)
+Set-ExecutionPolicy RemoteSigned    # Scripts locaux OK, distants signés
+Set-ExecutionPolicy Unrestricted    # Tout autorisé ⚠️
+
+# Scopes
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser  # Utilisateur courant
+Set-ExecutionPolicy RemoteSigned -Scope Process      # Session courante
+```
+
+### Gestion Erreurs
+```powershell
+# Variables d'erreur globales
+$Error                        # Tableau toutes erreurs
+$Error[0]                    # Dernière erreur
+$Error.Clear()               # Vider historique
+
+# ErrorAction par cmdlet
+Get-Service NonExistant -ErrorAction SilentlyContinue
+Get-Process BadName -ErrorAction Stop
+Get-Item MissingFile -ErrorAction Ignore
+
+# ErrorVariable personnalisée
+Get-Service -ErrorVariable myErrors
+$myErrors                    # Erreurs stockées séparément
+
+# Try/Catch/Finally
+try {
+    Get-Item "C:\NonExistant.txt" -ErrorAction Stop
+} catch [System.IO.FileNotFoundException] {
+    Write-Warning "Fichier non trouvé"
+} catch {
+    Write-Error "Erreur générique: $($_.Exception.Message)"
+} finally {
+    Write-Host "Nettoyage exécuté"
+}
+```
+
+## 🌐 PowerShell Remoting
+
+### Configuration & Sessions
+```powershell
+# Activation côté cible
+Enable-PSRemoting -Force      # Active WinRM (ports 5985 HTTP, 5986 HTTPS)
+
+# Sessions interactives
+Enter-PSSession -ComputerName SERVER01
+Enter-PSSession -ComputerName SERVER01 -Credential $cred
+Exit-PSSession               # Quitter session
+
+# Sessions persistantes
+$session = New-PSSession -ComputerName SERVER01
+Invoke-Command -Session $session -ScriptBlock { Get-Service }
+Get-PSSession               # Lister sessions actives
+Remove-PSSession $session   # Fermer session
+```
+
+### Exécution Distante
+```powershell
+# Commande ponctuelle
+Invoke-Command -ComputerName SERVER01 -ScriptBlock { Get-EventLog System -Newest 10 }
+
+# Multi-serveurs simultané
+Invoke-Command -ComputerName SRV01,SRV02,SRV03 -ScriptBlock { Get-Service Spooler }
+
+# Avec fichier script
+Invoke-Command -ComputerName SERVER01 -FilePath "C:\Scripts\Audit.ps1"
+
+# Import module distant
+$s = New-PSSession -ComputerName DC01
+Import-PSSession -Session $s -Module ActiveDirectory -Prefix Remote
+Get-RemoteADUser -Identity "jdoe"  # Utilise module distant avec préfixe
+```
+
+### Credentials Sécurisés
+```powershell
+# Demande interactive
+$cred = Get-Credential -UserName "DOMAIN\admin" -Message "Authentification requise"
+
+# Depuis variables sécurisées
+$password = ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential("DOMAIN\admin", $password)
+
+# Usage
+New-PSSession -ComputerName SERVER01 -Credential $cred
+```
+
+## ⚙️ Fonctions & Paramètres
+
+### Définition Fonctions
+```powershell
+# Fonction simple
+function Get-SystemInfo {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ComputerName,
+        
+        [Parameter()]
+        [switch]$IncludeServices
+    )
+    
+    $info = Get-ComputerInfo -ComputerName $ComputerName
+    
+    if ($IncludeServices) {
+        $info | Add-Member -NotePropertyName Services -NotePropertyValue (Get-Service)
+    }
+    
+    return $info
+}
+
+# Fonction avancée (cmdlet-like)
+function Get-ProcessInfo {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline=$true)]
+        [string[]]$ProcessName = "*"
+    )
+    
+    begin { Write-Verbose "Démarrage traitement" }
+    
+    process {
+        foreach ($name in $ProcessName) {
+            Get-Process -Name $name | Select-Object Name, CPU, WorkingSet
+        }
+    }
+    
+    end { Write-Verbose "Traitement terminé" }
+}
+```
+
+### Types de Paramètres
+```powershell
+# Paramètres typés
+[Parameter(Mandatory=$true)]
+[ValidateSet("Dev","Test","Prod")]
+[string]$Environment
+
+[Parameter()]
+[ValidateRange(1,100)]
+[int]$Percentage
+
+[Parameter()]
+[ValidateScript({Test-Path $_ -PathType Container})]
+[string]$FolderPath
+
+# Switch parameters
+[Parameter()]
+[switch]$Force
+```
+
+## 📊 Flux & Redirection
+
+### Streams PowerShell
+| Stream | Numéro | Description | Cmdlet |
+|--------|--------|-------------|--------|
+| **Success** | 1 | Sortie normale | `Write-Output` |
+| **Error** | 2 | Erreurs | `Write-Error` |
+| **Warning** | 3 | Avertissements | `Write-Warning` |
+| **Verbose** | 4 | Infos détaillées | `Write-Verbose` |
+| **Debug** | 5 | Debug | `Write-Debug` |
+| **Information** | 6 | Informations | `Write-Information` |
+
+### Redirections
+```powershell
+# Redirections basiques
+Command > output.txt          # Sortie vers fichier (écrase)
+Command >> output.txt         # Ajout au fichier
+Command 2> errors.txt         # Erreurs vers fichier
+Command 2>&1                  # Erreurs vers sortie standard
+
+# Redirections PowerShell
+Command *> all.txt            # Tous streams vers fichier
+Command 3> warnings.txt       # Warnings vers fichier
+Command 2> $null             # Ignorer erreurs
+```
+
+## 🛠️ Outils Système & WMI
+
+### Informations Système
+```powershell
+# Informations générales
+Get-ComputerInfo             # Infos système complètes
+Get-Date                     # Date/heure système
+$PSVersionTable              # Version PowerShell
+$env:USERNAME                # Variables environnement
+$env:COMPUTERNAME
+[Environment]::OSVersion     # Version OS
+
+# Processus & Services
+Get-Process                  # Processus actifs
+Get-Service                  # Services Windows
+Get-EventLog System -Newest 50  # Journaux événements
+```
+
+### WMI/CIM (Windows Management)
+```powershell
+# CIM (moderne, cross-platform)
+Get-CimInstance -ClassName Win32_ComputerSystem
+Get-CimInstance -ClassName Win32_LogicalDisk
+Get-CimInstance -ClassName Win32_NetworkAdapter
+
+# Filtrage CIM
+Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DriveType = 3"  # Disques fixes
+Get-CimInstance -ClassName Win32_Service -Filter "State = 'Running'"
+
+# WMI (legacy Windows)
+Get-WmiObject -Class Win32_ComputerSystem  # Legacy, éviter si possible
+```
+
+## 💡 Bonnes Pratiques
+
+### Performance & Lisibilité
+- ✅ **Filtrer tôt** : `Get-Process -Name "notepad"` vs `Get-Process | Where-Object Name -eq "notepad"`
+- ✅ **Utiliser paramètres natifs** quand disponibles plutôt que pipeline
+- ✅ **Variables explicites** : `$PSItem` au lieu de `$_` dans scripts
+- ✅ **Types appropriés** : ArrayList pour collections modifiables fréquemment
+
+### Sécurité & Robustesse
+- ✅ **Validation entrées** : `[ValidateScript()]`, `[ValidateSet()]`
+- ✅ **Gestion erreurs** : Try/Catch pour opérations critiques
+- ✅ **Credentials sécurisés** : `Get-Credential`, jamais en dur
+- ✅ **Execution Policy** appropriée selon environnement
+
+### Code Quality
+- ✅ **Nommage cohérent** : Convention Verbe-Nom
+- ✅ **Commentaires** : `# Description` et help blocks
+- ✅ **Indentation** : 4 espaces recommandés
+- ✅ **Tests** : Pester pour tests unitaires
+
+### Debugging
+```powershell
+# Techniques debug courantes
+Write-Host "Debug: variable = $variable" -ForegroundColor Yellow
+$variable | Out-Host          # Forcer affichage dans pipeline
+$variable | Get-Member        # Vérifier type/propriétés
+Set-PSBreakpoint -Script .\script.ps1 -Line 25  # Points arrêt
+```

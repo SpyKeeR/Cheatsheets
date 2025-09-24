@@ -1,5 +1,3 @@
-Fichier : Système/Windows/Serveur/Administration/mdt.md
-
 # 🚀 Microsoft Deployment Toolkit (MDT) — Cheatsheet
 
 ## 🎯 Vue d'ensemble

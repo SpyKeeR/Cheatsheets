@@ -299,8 +299,7 @@ winget import -i winget-config.yaml --accept-package-agreements --accept-source-
 | **Microsoft-Windows-Deployment-Services-Diagnostics/Operational** | 4097-4115 | Client deployment events |
 | **System** | 7001,7002 | WDS service events |
 | **Microsoft-Windows-Deployment-Services/Operational** | 513,515 | Image serving events |
-
-
+| **Application** | Various | MDT task sequence logs |
 
 ## 🛠️ Troubleshooting
 
