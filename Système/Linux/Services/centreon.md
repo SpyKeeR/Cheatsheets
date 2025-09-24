@@ -1,188 +1,401 @@
-# Centreon — super-condensé
+# 📊 Centreon — Aide-mémoire
 
-### Modes de supervision
-- Actif local : superviseur lance check local (ex : check_tcp) — pas d’agent.  
-- Actif distant : superviseur déclenche commande distante via NRPE/SNMP/WMI/SSH.  
-- Passif : hôte pousse les événements (SNMP Trap, NSCA, etc.) → utile pour alertes temps réel.
+## 🏗️ Architecture & Concepts
 
-### Déploiement & installation (notes courtes)
-- Options : ISO Centreon (rapide), paquets RPM (RHEL-based), VM préconfigurée, sources (avancé).  
-- OS recommandé : RHEL-family (Alma/Rocky) ou images officielles Centreon.
-
-### Cycle config Centreon
-- Édition via Web → sauvegarde en BDD.  
-- Génération fichiers `.cfg` → stockage temporaire `/usr/share/centreon/filesGeneration/`.  
-- Move → `/etc/centreon/*.cfg` puis reload moteur.  
-- Génération via Configuration → Pollers → Export Configuration 
-	- Test(debug UI) → pour simuler la génération (mode debug)
-	- Génération → pour vérifier les fichiers
-	- Déplace+Reload → pour appliquer en production
-
-### Fichiers & composants clés
-- Centreon Web (PHP) — UI  
-- Centreon Engine — moteur (fork Nagios)  
-- Centreon Broker — collecte/export  
-- Base → MySQL/MariaDB (historique, configs)  
-- Agent NRPE conf : /etc/nagios/nrpe.cfg  
-- NSClient++ Windows : C:\Program Files\NSClient++\nsclient.ini 
-- SNMPd Linux : /etc/snmp/snmpd.conf  
-- SNMP queries → UDP 161 | SNMP traps → UDP 162 | NRPE → TCP 5666 | NSClient++ web → TCP 8443
-
-## SNMP (v1/v2c/v3)
-- Démon : snmpd
-- Paquets : snmp, snmpd ; conf → /etc/snmp/snmpd.conf  
-- Principales directives :
-	- Listening : `agentAddress udp:161` (ou restreint `udp:127.0.0.1:161`)
-	- Communauté RO/RW : `r{o,w}community commu default|IP -V VueSysteme`
-	- Vue : `view SystemeOnly included .1.3.6.1.2.1.1`
-	- Old config :
-		- `com2sec` → `com2sec notSecure 127.0.0.1 public` → notSecure : Nom d'entité, 127.0.0.1 : IP/Réseau, public : Nom de communauté v2c
-		- `group` → `group readonlyGroup v2c notSecure` → readonlyGroup : Nom de groupe, v2c : Version SNMP, notSecure : Nom d'entité com2sec
-		- `access` → `access readonlyGroup "" any noauth exact complete none none`
-			- "readonlyGroup" ➤ groupe défini
-			- "" ➤ nom d’utilisateur (vide ici car v1/v2c)
-			- any ➤ n’importe quel contexte SNMP
-			- noauth ➤ pas d’authentification (cas de v1/v2c)
-			- exact ➤ correspondance exacte entre utilisateur/contexte
-			- SystemeOnly ➤ view autorisée en lecture
-			- none ➤ pas de view en écriture
-			- none ➤ pas de view pour les traps
-
-### Installation SNMP sous Windows
-- Installation  ➤ `Install-WindowsFeature -Name SNMP -IncludeManagementTools` (Avant Win 10 20H2/11)
-- Autre méthode ➤ `Add-WindowsCapability -Online -Name "SNMP.Client~~~~0.0.1.0"`
-- Accès à la config ➤ services.msc, clic droit sur "Service SNMP" → onglet Sécurité
-
-### Installation SNMP sous Debian
-- Installation ➤ `apt install snmpd`
-- Fichier de configuration ➤ /etc/snmp/snmpd.conf
-- Redémarrage du service requis ➤ `systemctl restart snmpd`
-
-### SNMP Trap & passive
-- Activer traps sur agent/équipement ; superviseur doit écouter/recevoir.  
-- Format : trap envoyé → mapping vers service/alerte Centreon via broker/handler.  
-- Outils passifs : SNMP Trap Daemon, NSCA pour push d'events.
-
-### SNMP — vues/MIBs rapides
-- View = filtrer OIDs exposées (ex: .1.3.6.1.2.1.1 pour info système)  
-- MIB/OID → utiliser `snmpwalk`/`snmpget` pour debug  
-- Exemples utiles : sysDescr `.1.3.6.1.2.1.1.1.0`, uptime `.1.3.6.1.2.1.1.3.0`
-
-## NRPE
-- Archi : Engine → check_nrpe → NRPE demon → plugin local → retour.  
-- Installer : `nrpe + nagios-plugins`; conf `allowed_hosts` → IP superviseur.  
-- Test : `check_nrpe -H 192.168.1.50 -c check_load`  
-- Sécurité : restreindre allowed_hosts, utiliser TLS si dispo, limiter commandes.
-
-### NSClient++ (Windows)
-- Installer / activer modules (NRPE, Checkers).  
-- UI locale : https://localhost:8443 (auth). 
-- Modules : activer les plugins nécessaires (ex. CPU, disque, RAM)
-- Queries : tester les plugins avec des requêtes manuelles
-- Paramètre important : Allow arguments = true ; Allow nasty characters = true (si paramètres).  
-- Tester via Centreon plugin ou interface.
-
-### CMA / OTLP
-- CMA : Centreon Monitoring Agent (NEW Agent)
-- OTLP : Open Telemetry L Protocol (NEW NRPE)
-- **A compléter après un lab** ⚠
-
-## Sondes
-
-### Workflow sonde 
-
-- Lecture config et récupère la commande associée au service/hôte.
-- Execution commande (local/distance).
-- Interrogation du host, récupère une valeur (charge, disponibilité, etc.).
-- Retour code de statut : 0 = OK, 1 = WARNING, 2 = CRITICAL, 3 = UNKNOWN, 4 = PENDING
-- Centreon-engine lit le code et met à jour l’état du service/hôte.
-
-### Sondes & chemins
-- Nagios plugins : `/usr/lib/nagios/plugins`, `/usr/lib64/nagios/plugins`
-- Centreon plugins : `/usr/lib/centreon/plugins`  
-- Exemples : `check_ping`, `check_http`, `check_disk`, `check_load`
-
-### Centreon plugins — usage rapide
-- Lister modes/help : `--help`, `--list-plugin`, `--list-mode`  
-- Exemple SNMP CPU :  
-```bash
-centreon_linux_snmp.pl --plugin=os::linux::snmp::plugin --mode=cpu --hostname=172.16.1.3 --snmp-community=public --snmp-version=2 --warning-average=80 --critical-average=90
+### Composants Centreon
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Central Web   │    │    Poller       │    │    Agents       │
+│  (Interface)    │    │   (Engine)      │    │  (NRPE/SNMP)    │
+├─────────────────┤    ├─────────────────┤    ├─────────────────┤
+│ • PHP Web UI    │◄──►│ • Engine        │◄──►│ • NRPE Daemon   │
+│ • Configuration │    │ • Broker        │    │ • SNMP Agent    │
+│ • Base de donnée│    │ • Gorgone       │    │ • NSClient++    │
+│ • Gorgone       │    │ • Plugins       │    │ • CMA (nouveau) │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### Plugin execution & sortie (format attendu)
-- Sortie = `code retour | texte lisible | perfdata`  
-  - Ex : `PING OK - 0% loss, rta=0.344ms | rta=0.344ms;1;2;0 pl=0%;50;80;0`    
-- Perfdata → utilisé par graphing (RRD/metrics)
+### Flux de Données
+1. **Configuration** : Web UI → Base MySQL → Génération fichiers .cfg
+2. **Supervision** : Engine → Plugins → Agents → Résultats
+3. **Collecte** : Broker → Métriques → RRD/InfluxDB → Graphiques
 
-### Macros & variables
-- Standards (Nagios) : `$HOSTADDRESS$`, `$SERVICESTATE$`, etc. [Issues de Nagios](https://assets.nagios.com/downloads/nagioscore/docs/nagioscore/3/en/macrolist.html), intégrées nativement (non modifiables).
-- Ressources (globales) : `$USER1$`, `$CENTREONPLUGINS$` (définies via Configuration → Pollers → Resources).  
-- Arguments : `$ARG1$`…`$ARG32$` (remplacé souvent par macros personnalisées).  
-- Macros personnalisées : `$_HOSTnom$`, `$_SERVICEnom$` → lisibles, réutilisables (`$_HOSTmacro$` → assignée à un hôte | `$_SERVICEmacro$` → assignée à un service)
-- Macros à la demande : `$HOSTSTATE:nomhôte$` (Calcul valeur temps réel, à éviter).
+## ⚙️ Cycle Configuration
 
-### Etats & notifications
-- SOFT = essais de confirmation (pas de notif). HARD = état confirmé → notif possible.  
-- Workflow notifications : 
-	- Statut HARD
-	- Notifications activées hôte service ET templates
-	- Pas de Downtime actif
-	- Période de notification OK
-	- Type d'état a notif (critical/warning)
-	- Ciblage et config contact : 
-		- Activation Notification
-		- Période de notification OK
-		- Notif autorisée pour le type de statut
-	- Execution de la commande de notif
+### Workflow Configuration
+```bash
+# 1. Configuration via Web UI
+Configuration → Hosts/Services → Modification
 
-### Actions immédiates
-- Immediate Check → replanifie un test au prochain cycle de supervision
-- Forced reschedule → exécute un test immédiatement
-- Mass actions (UI)  
+# 2. Génération & Test
+Configuration → Pollers → Export Configuration
+├── Test       # Simulation (debug)
+├── Génération # Vérification fichiers .cfg
+└── Déplace+Reload # Application production
 
-### ACL & catégories (accès)
-- 3 blocs : 
-	- ACL Resources (objets) → Définissent ce qu’on protège
-	- ACL Menus (UI) → Définissent ce qu’on affiche dans l’UI
-	- ACL Actions (opérations) → Définissent ce que l’utilisateur peut faire
-- Regroupés en ACL Group → associé à users/groups.  
-- Categories ≠ groupes : Catégories servent de filtre visibilité + héritage modèles.
+# 3. Fichiers générés
+/usr/share/centreon/filesGeneration/  # Temporaire
+/etc/centreon-engine/               # Production
+```
 
-### Pollers (collecteurs)
-- Rôle : Engine + Broker Module (exécutent checks localement, remontent résultats).  
-- Communication Central ↔ Poller via SSH (ou ZMQ) → échange de clés RSA/config YAML obligatoire.  
-- Ajout Poller : Configuration → Pollers → Add > copier YAML Gorgone (Central) → coller sur Poller → crée `/etc/centreon-gorgone/config.d/40-gorgoned.yaml`.  
-- Sur Poller : `systemctl restart gorgoned` ; `systemctl enable gorgoned`.  
-- En cas d’échec : restart `centengine`, `centreon`, `gorgoned` ; réexporter config ; dernier recours reboot.
+### États Services
+| Code | État | Description |
+|------|------|-------------|
+| **0** | OK | Service fonctionnel |
+| **1** | WARNING | Avertissement |
+| **2** | CRITICAL | Critique |
+| **3** | UNKNOWN | État indéterminé |
+| **4** | PENDING | En attente de vérification |
 
-### Raccourcis utiles
-- `snmpwalk -v2c -c <comm> <host> <OID>` → parcourir OID  
-- `snmpget -v2c -c <comm> <host> <OID>` → valeur précise  
-- `check_nrpe -H <host> -c <cmd>` → tester NRPE  
-- `su - centreon-engine` → tester comme moteur
+### États SOFT vs HARD
+- **SOFT** : État temporaire, en cours de confirmation (pas de notification)
+- **HARD** : État confirmé après X tentatives (notifications possibles)
 
-### Logs & debug
-- Centreon Engine logs → `journalctl -u centreon-engine|centreon-broker` OU /var/log/centreon-engine
-- Logs moteur/poller → `journalctl -u centreon-engine|gorgoned`
-- NRPE debug via `nrpe -c ...` OU `systemctl status`
-- bind/trap/snmp → `journalctl` OU /var/log/syslog
+## 🔌 Protocoles de Supervision
 
-### Bonnes pratiques rapides 
-- Séparer roles (DB, Engine, Broker) pour scalabilité.  
-- Tests : simuler comme engine `su - centreon-engine` puis exécuter commandes/plugins.  
-- Monitoring redondant : config High-Availability / sondes multiples si critique.
-- Tester NRPE/SNMP/Plugins localement depuis poller/central pour isoler. 
-- Utiliser macros personnalisées pour lisibilité, généralisation de sondes. 
-- Valider en Test avant Déplacer+Reload.  
-- Limiter macros en temps réel (ressources). 
-- Template attention : une option désactivée dans un template se propage.
-- Sauvegarder configs / versionner exports.  
+### SNMP (Simple Network Management Protocol)
+```bash
+# Ports & Versions
+UDP 161   # Requêtes SNMP
+UDP 162   # Traps SNMP
+v1/v2c    # Communautés (public/private)
+v3        # Authentification + chiffrement
 
-### Notes rapides sécurité
-- Restreindre SNMP (v2c communities modifiées ou v3).
-- NSClient++ : activer TLS/HTTPS si possible, limiter IP, utiliser auth locale.  
-- NRPE : allowed_hosts strict. 
-- Chiffrement/ZMQ pour communications Central↔Poller.
-- Restreindre accès pollers/agents (IP, clés RSA).  
-- Restreindre commandes autorisées sur agents.  
-- Sécuriser accès UI (roles/ACL).  
+# Configuration Linux (/etc/snmp/snmpd.conf)
+agentAddress udp:161                    # Port d'écoute
+rocommunity public 192.168.1.0/24      # Communauté lecture
+rwcommunity private 192.168.1.10       # Communauté écriture
+
+# Vue SNMP (restriction OID)
+view SystemOnly included .1.3.6.1.2.1.1
+access readonlyGroup "" any noauth exact SystemOnly none none
+
+# Tests SNMP
+snmpwalk -v2c -c public 192.168.1.10 .1.3.6.1.2.1.1.1.0  # sysDescr
+snmpget -v2c -c public 192.168.1.10 .1.3.6.1.2.1.1.3.0   # uptime
+```
+
+### NRPE (Nagios Remote Plugin Executor)
+```bash
+# Port & Configuration
+TCP 5666  # Port par défaut
+
+# Configuration NRPE (/etc/nagios/nrpe.cfg)
+allowed_hosts=127.0.0.1,192.168.1.5     # IPs autorisées
+server_address=0.0.0.0                  # Écoute toutes interfaces
+
+# Commandes définies
+command[check_load]=/usr/lib/nagios/plugins/check_load -w 15,10,5 -c 30,25,20
+command[check_disk]=/usr/lib/nagios/plugins/check_disk -w 20% -c 10% -p /
+
+# Test depuis poller
+check_nrpe -H 192.168.1.10 -c check_load
+/usr/lib/nagios/plugins/check_nrpe -H 192.168.1.10 -c check_disk
+```
+
+### NSClient++ (Windows)
+```powershell
+# Installation & Configuration
+Install-WindowsFeature -Name SNMP -IncludeManagementTools
+# ou télécharger NSClient++ depuis nscp.org
+
+# Configuration (C:\Program Files\NSClient++\nsclient.ini)
+[/settings/default]
+allowed hosts = 127.0.0.1,192.168.1.5
+password = MonMotDePasse
+
+[/modules]
+CheckSystem = enabled        # CPU, RAM, Disque
+CheckDisk = enabled         # Vérifications disques
+NRPE = enabled              # Support NRPE
+NSCAClient = enabled        # Mode passif
+
+# Interface Web
+https://localhost:8443      # Interface web locale
+```
+
+## 🔍 Plugins & Sondes
+
+### Emplacements Plugins
+```bash
+# Plugins Nagios standard
+/usr/lib/nagios/plugins/
+/usr/lib64/nagios/plugins/
+
+# Plugins Centreon
+/usr/lib/centreon/plugins/
+
+# Plugins personnalisés
+/usr/local/nagios/plugins/
+```
+
+### Plugins Centreon (Nouvelle Génération)
+```bash
+# Structure commande
+centreon_linux_snmp.pl --plugin=os::linux::snmp::plugin \
+    --mode=cpu \
+    --hostname=192.168.1.10 \
+    --snmp-community=public \
+    --snmp-version=2c \
+    --warning-average=80 \
+    --critical-average=90
+
+# Options communes
+--help                      # Aide
+--list-plugin              # Lister plugins disponibles
+--list-mode               # Lister modes pour plugin
+--verbose                 # Mode verbeux
+```
+
+### Format Sortie Plugin
+```
+ÉTAT MESSAGE | perfdata
+├── ÉTAT: OK, WARNING, CRITICAL, UNKNOWN
+├── MESSAGE: Description lisible
+└── perfdata: métriques pour graphiques
+
+Exemple:
+CPU OK - 15% used | cpu=15%;80;90;0;100
+```
+
+## 🎯 Macros & Variables
+
+### Types de Macros
+| Type | Format | Exemple | Usage |
+|------|--------|---------|-------|
+| **Standard** | `$VARIABLE$` | `$HOSTADDRESS$` | Variables Nagios intégrées |
+| **Ressources** | `$USERx$` | `$USER1$` | Chemins globaux |
+| **Arguments** | `$ARGx$` | `$ARG1$` | Paramètres commandes |
+| **Personnalisées** | `$_HOSTnom$` | `$_HOSTSNMP$` | Macros utilisateur |
+
+### Macros Essentielles
+```bash
+# Macros hôte
+$HOSTADDRESS$               # Adresse IP hôte
+$HOSTNAME$                  # Nom hôte
+$HOSTSTATE$                 # État hôte (UP, DOWN, etc.)
+
+# Macros service
+$SERVICEDESC$               # Description service
+$SERVICESTATE$              # État service
+$SERVICEOUTPUT$             # Sortie plugin
+
+# Macros ressources (/etc/centreon/resource.cfg)
+$USER1$=/usr/lib/nagios/plugins        # Chemin plugins
+$CENTREONPLUGINS$=/usr/lib/centreon/plugins
+```
+
+### Définition Macros Personnalisées
+```bash
+# Dans configuration hôte
+_SNMPCOMM    public         # $_HOSTSNMPCOMM$
+_HTTPPORT    8080          # $_HOSTHTTPPORT$
+
+# Dans configuration service  
+_THRESHOLD   80,90         # $_SERVICETHRESHOLD$
+_DISK        /var          # $_SERVICEDISK$
+```
+
+## 🌐 Pollers & Architecture Distribuée
+
+### Types d'Architecture
+- **Central** : Tout sur un serveur (Web + Engine + DB)
+- **Distributed** : Central + Pollers distants
+- **Redundant** : Haute disponibilité avec failover
+
+### Configuration Poller
+```bash
+# 1. Installation poller
+yum install centreon-poller-centreon-engine centreon-poller-gorgone
+
+# 2. Configuration Gorgone (/etc/centreon-gorgone/config.d/40-gorgoned.yaml)
+name: poller-paris
+description: Poller site Paris
+gorgone:
+  gorgonecore:
+    id: 2
+    external_com_type: tcp
+    external_com_path: "*:5556"
+    authorized_clients:
+      - key: "clé-publique-central"
+    privkey: "/var/lib/centreon-gorgone/.keys/rsa_priv.key"
+    pubkey: "/var/lib/centreon-gorgone/.keys/rsa_pub.key"
+
+# 3. Échange clés SSH Central ↔ Poller
+ssh-copy-id centreon@poller-ip
+
+# 4. Redémarrage services
+systemctl restart gorgoned centengine
+systemctl enable gorgoned centengine
+```
+
+### Communication Central-Poller
+```bash
+# Protocols
+SSH         # Configuration & fichiers
+ZMQ         # Communication temps réel (port 5556)
+BBDO        # Broker Binary Data Objects
+
+# Test connectivité
+su - centreon
+ssh poller-hostname
+```
+
+## 📊 Supervision Passive
+
+### SNMP Traps
+```bash
+# Configuration récepteur traps
+/etc/snmp/snmptrapd.conf:
+authCommunity log,execute,net public
+traphandle default /usr/bin/centreon_trap_send
+
+# Traitement traps
+centreon_trap_recv → centreon_trap_send → Centreon DB
+```
+
+### NSCA (Nagios Service Check Acceptor)
+```bash
+# Configuration NSCA
+/etc/nsca.cfg:
+server_port=5667
+decryption_method=1
+password=MonMotDePasse
+
+# Envoi résultat passif
+echo "hostname;service;status;output" | send_nsca -H central-ip -c nsca.cfg
+```
+
+## 🔒 ACL & Sécurité
+
+### Structure ACL Centreon
+```
+ACL Group (Groupe d'accès)
+├── ACL Resources (Objets accessibles)
+│   ├── Hosts
+│   ├── Services  
+│   └── Host Categories
+├── ACL Menus (Menus UI accessibles)
+│   ├── Configuration
+│   ├── Monitoring
+│   └── Administration
+└── ACL Actions (Actions autorisées)
+    ├── Service Check
+    ├── Host Check
+    └── Generate Configuration
+```
+
+### Bonnes Pratiques Sécurité
+```bash
+# SNMP v3 avec authentification
+snmpget -v3 -l authPriv -u user -a SHA -A authpass -x AES -X privpass \
+    192.168.1.10 .1.3.6.1.2.1.1.1.0
+
+# NRPE avec SSL
+nrpe_args="-n"              # Désactiver SSL (pas recommandé)
+# Préférer: Certificats SSL + allowed_hosts restrictifs
+
+# NSClient++ sécurisé
+password = ComplexPassword123!
+allowed hosts = 192.168.1.5/32
+use ssl = true
+```
+
+## 🔧 Maintenance & Dépannage
+
+### Downtime & Acquittements
+```bash
+# Planifier maintenance (Downtime)
+Monitoring → Downtimes → Add
+├── Type: Host/Service
+├── Durée: Fixe/Flexible  
+├── Notification: Oui/Non
+└── Commentaire: Raison maintenance
+
+# Acquitter alerte
+Monitoring → Event Logs → Acknowledge
+├── Sticky: Maintenir acquittement
+├── Notify: Notifier contacts
+└── Persistent: Survivre redémarrage
+```
+
+### Commandes de Debug
+```bash
+# Logs Centreon
+journalctl -u centreon-engine -f
+journalctl -u centreon-broker -f
+journalctl -u gorgoned -f
+tail -f /var/log/centreon-engine/centengine.log
+
+# Test plugins manuellement
+su - centreon-engine
+/usr/lib/nagios/plugins/check_ping -H 192.168.1.10 -w 100,10% -c 500,50%
+
+# Vérification configuration
+centreon-engine -v /etc/centreon-engine/centengine.cfg
+```
+
+### Résolution Problèmes Courants
+| Problème | Cause Probable | Solution |
+|----------|----------------|----------|
+| **Poller non connecté** | Clés SSH/ZMQ | Régénérer clés, restart gorgoned |
+| **Plugin UNKNOWN** | Chemin/permissions | Vérifier $USER1$, chmod +x |
+| **Pas de notifications** | Configuration contacts | Vérifier periods, enable notifications |
+| **Graphiques vides** | Broker/RRD | Restart broker, check perfdata |
+| **NRPE Connection refused** | Firewall/config | Check port 5666, allowed_hosts |
+
+## 📈 Métriques & Performance
+
+### Optimisation Base de Données
+```sql
+-- Purge données anciennes
+DELETE FROM data_bin WHERE ctime < UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY));
+
+-- Index performance
+SHOW INDEX FROM data_bin;
+ANALYZE TABLE data_bin;
+```
+
+### Tuning Engine
+```bash
+# /etc/centreon-engine/centengine.cfg
+check_result_reaper_frequency=5     # Fréquence collecte résultats
+max_concurrent_checks=400           # Checks simultanés max
+cached_host_check_horizon=900       # Cache résultats hôte
+cached_service_check_horizon=900    # Cache résultats service
+```
+
+### Surveillance Centreon
+```bash
+# Métriques importantes à surveiller
+- CPU/RAM poller
+- Latence checks
+- Queue Broker
+- Taille base données
+- Espace disque RRD
+
+# Commandes utiles
+centreon -u admin -p passwd -a POLLERLIST
+centreon -u admin -p passwd -a POLLERGENERATE -v 1
+```
+
+## 📋 Check-list Déploiement
+
+### Installation Nouvelle Instance
+- [ ] **OS** : RHEL/CentOS/Alma Linux à jour
+- [ ] **Dépôts** : Centreon, EPEL, Remi configurés
+- [ ] **MariaDB** : Optimisée (my.cnf)
+- [ ] **Apache/PHP** : Configuration selon prérequis
+- [ ] **Firewall** : Ports ouverts (80, 443, 5666, 161/162)
+- [ ] **SELinux** : Configuré ou désactivé selon politique
+
+### Post-Installation
+- [ ] **Wizard** : Configuration initiale Web
+- [ ] **Pollers** : Ajout et configuration 
+- [ ] **Plugins** : Installation packs nécessaires
+- [ ] **Modèles** : Import templates métier
+- [ ] **ACL** : Configuration accès utilisateurs
+- [ ] **Monitoring** : Supervision Centreon lui-même
+
+---
+**💡 Memo** : Générer config après modifications, tester plugins en CLI, vérifier ACL pour accès, surveiller logs pour debug !

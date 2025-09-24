@@ -1,54 +1,60 @@
-# 🔐 PKI, AD CS & OpenSSL — Cheatsheet
+# 🔐 PKI, AD CS & OpenSSL — Aide-mémoire
 
-## 🏗️ Concepts PKI Fondamentaux
+## 🏗️ Architecture PKI
 
 ### Hiérarchie Certificats
 ```
-Root CA (Offline)
-    ├── Subordinate CA (Online)
-    │   ├── Server Certificates
-    │   ├── Client Certificates
-    │   └── Code Signing
-    └── Issuing CA
-        ├── User Certificates
-        └── Device Certificates
+Root CA (Offline/HSM)
+    ├── Intermediate CA (Online)
+    │   ├── Issuing CA (Server Certs)
+    │   ├── User CA (Client Certs)
+    │   └── Code Signing CA
+    └── Cross-Certification
+        └── External Trust Anchors
 ```
 
-### Types de Certificats par Usage
-| Type | Usage | Validation | Durée |
-|------|-------|------------|-------|
-| **DV** | Domain Validated | DNS/HTTP | 1-3 ans |
-| **OV** | Organization Validated | Entreprise vérifiée | 1-2 ans |
-| **EV** | Extended Validation | Validation poussée | 1 an |
-| **Wildcard** | `*.domain.com` | Sous-domaines | 1 an |
-| **SAN** | Multiple domains | Multi-domaines | 1-2 ans |
+### Types de Certificats
+| Type | Validation | Usage | Durée Typique |
+|------|------------|-------|---------------|
+| **DV** | Domain seul | Sites basiques | 1-3 ans |
+| **OV** | Organisation | Sites commerciaux | 1-2 ans |
+| **EV** | Validation étendue | Banques, e-commerce | 1 an |
+| **Wildcard** | `*.domain.com` | Sous-domaines illimités | 1 an |
+| **SAN/UCC** | Multi-domaines | Consolidation | 1-2 ans |
+| **Client** | Utilisateur/Device | Authentification | 1-3 ans |
+| **Code Signing** | Développeur | Signature logiciel | 1-3 ans |
 
-### Algorithmes Recommandés (2024)
-- **Asymétrique** : ECDSA P-256/P-384, Ed25519, RSA 2048+ (legacy)
-- **Symétrique** : AES-256-GCM, ChaCha20-Poly1305
-- **Hash** : SHA-256, SHA-384, SHA-3 (éviter SHA-1, MD5)
-- **TLS** : v1.3 > v1.2 (désactiver ≤v1.1)
+### Standards Cryptographiques (2024)
+| Usage | Recommandé | Legacy Acceptable | À Éviter |
+|-------|------------|-------------------|----------|
+| **Asymétrique** | ECDSA P-256/384, Ed25519 | RSA 2048+ | RSA <2048, DSA |
+| **Symétrique** | AES-256-GCM, ChaCha20 | AES-128-GCM | DES, 3DES, RC4 |
+| **Hash** | SHA-256, SHA-384, SHA-3 | SHA-256 | SHA-1, MD5 |
+| **TLS** | v1.3 | v1.2 | ≤v1.1 |
+| **Durée Cert** | 1 an | 2 ans | >2 ans |
 
-## 🛠️ OpenSSL — Commandes Essentielles
+## 🛠️ OpenSSL Essentiels
 
 ### Génération Clés & CSR
 ```bash
-# Clé privée ECDSA (recommandé)
+# Clé ECDSA (recommandée pour nouveaux déploiements)
 openssl ecparam -genkey -name prime256v1 -out private.key
+openssl ecparam -genkey -name secp384r1 -out private.key  # Plus sécurisé
 
-# Clé privée RSA
-openssl genrsa -aes256 -out private.key 2048
+# Clé RSA (legacy/compatibilité)
+openssl genrsa -aes256 -out private.key 2048    # Chiffrée
+openssl genrsa -out private.key 2048            # Non chiffrée
 
-# CSR avec config
-openssl req -new -key private.key -out request.csr -config ssl.conf
+# CSR interactif
+openssl req -new -key private.key -out request.csr
 
-# CSR one-liner
-openssl req -new -key private.key -out request.csr \
-  -subj "/C=FR/ST=IDF/L=Paris/O=Company/CN=domain.com"
+# CSR avec configuration
+openssl req -new -key private.key -out request.csr -config csr.conf
 ```
 
-### Configuration CSR (ssl.conf)
+### Template Configuration CSR
 ```ini
+# csr.conf
 [req]
 distinguished_name = req_distinguished_name
 req_extensions = v3_req
@@ -56,309 +62,453 @@ prompt = no
 
 [req_distinguished_name]
 C = FR
-ST = Ile-de-France
+ST = Ile-de-France  
 L = Paris
 O = Mon Entreprise
+OU = IT Department
 CN = www.example.com
 
 [v3_req]
 basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
 subjectAltName = @alt_names
 
 [alt_names]
 DNS.1 = example.com
 DNS.2 = www.example.com
 DNS.3 = api.example.com
+IP.1 = 192.168.1.100
 ```
 
 ### Certificats Auto-signés
 ```bash
-# Auto-signé simple
-openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
-
-# Auto-signé avec SAN
+# Auto-signé simple (développement)
 openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem \
-  -days 365 -nodes -config ssl.conf -extensions v3_req
+    -days 365 -nodes -subj "/CN=localhost"
+
+# Auto-signé avec SAN (test/lab)
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem \
+    -days 365 -nodes -config csr.conf -extensions v3_req
+
+# CA racine maison
+openssl req -x509 -newkey rsa:4096 -keyout ca-key.pem -out ca-cert.pem \
+    -days 3650 -nodes -subj "/CN=My Root CA"
 ```
 
-### Validation & Tests
+### Validation & Diagnostic
 ```bash
-# Afficher certificat
+# Afficher certificat détaillé
 openssl x509 -in cert.pem -text -noout
+openssl x509 -in cert.pem -noout -dates -subject -issuer
 
 # Vérifier CSR
-openssl req -in request.csr -text -noout
+openssl req -in request.csr -text -noout -verify
 
-# Vérifier correspondance clé/cert
-openssl rsa -in private.key -pubout | openssl md5
+# Correspondance clé/certificat
+openssl pkey -in private.key -pubout | openssl md5
 openssl x509 -in cert.pem -pubkey -noout | openssl md5
 
-# Test TLS serveur
+# Test connexion TLS
 openssl s_client -connect domain.com:443 -servername domain.com
+openssl s_client -connect domain.com:443 -showcerts | openssl x509 -text
 
 # Vérifier chaîne complète
-openssl s_client -connect domain.com:443 -showcerts
+openssl verify -CAfile ca-bundle.pem cert.pem
+openssl s_client -connect site.com:443 -verify_return_error
 ```
 
-### Formats & Conversions
+### Conversions Formats
 ```bash
-# PEM → DER
+# PEM ↔ DER
 openssl x509 -in cert.pem -outform DER -out cert.der
+openssl x509 -in cert.der -inform DER -outform PEM -out cert.pem
 
-# PEM → PKCS#12 (.pfx/.p12)
-openssl pkcs12 -export -out cert.pfx -inkey private.key -in cert.pem -certfile ca.pem
+# Créer PKCS#12 (.pfx/.p12)
+openssl pkcs12 -export -out cert.pfx \
+    -inkey private.key -in cert.pem -certfile ca-chain.pem \
+    -name "My Certificate"
 
-# PKCS#12 → PEM
-openssl pkcs12 -in cert.pfx -out cert.pem -nodes
+# Extraire de PKCS#12
+openssl pkcs12 -in cert.pfx -out cert-and-key.pem -nodes
+openssl pkcs12 -in cert.pfx -nokeys -out cert.pem        # Cert seulement
+openssl pkcs12 -in cert.pfx -nocerts -out key.pem -nodes # Clé seulement
 
-# Extraire clé publique
-openssl x509 -in cert.pem -pubkey -noout > public.key
+# Formats Windows/Java
+openssl crl2pkcs7 -nocrl -certfile cert.pem -out cert.p7b  # PKCS#7
+keytool -import -alias mycert -file cert.pem -keystore keystore.jks
 ```
 
-### Chiffrement Fichiers
+### Utilitaires Avancés
 ```bash
-# AES-256-CBC
-openssl enc -aes-256-cbc -salt -in file.txt -out file.enc
-openssl enc -aes-256-cbc -d -in file.enc -out file.txt
+# Infos SSL/TLS serveur distant
+echo | openssl s_client -connect site.com:443 2>/dev/null | \
+    openssl x509 -noout -dates -subject
 
-# Avec clé dérivée
-openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -in file.txt -out file.enc
+# Test cipher suites
+openssl s_client -connect site.com:443 -cipher 'ECDHE+AESGCM'
+
+# Générer DH params
+openssl dhparam -out dhparam.pem 2048
+
+# Vérifier révocation OCSP
+openssl ocsp -issuer ca.pem -cert cert.pem -url http://ocsp.example.com \
+    -CAfile ca-bundle.pem
 ```
 
-## 🏢 Active Directory Certificate Services (AD CS)
+## 🏢 Active Directory Certificate Services
 
 ### Installation & Configuration
 ```powershell
-# Installation rôle
+# Installation rôle AD CS
 Install-WindowsFeature ADCS-Cert-Authority -IncludeManagementTools
+Install-WindowsFeature ADCS-Web-Enrollment    # Interface web optionnelle
 
-# Configuration CA Enterprise
-Install-AdcsCertificationAuthority -CAType EnterpriseRootCA -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" -KeyLength 2048 -HashAlgorithmName SHA256
+# Configuration CA Enterprise Root
+Install-AdcsCertificationAuthority `
+    -CAType EnterpriseRootCA `
+    -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+    -KeyLength 4096 `
+    -HashAlgorithmName SHA256 `
+    -ValidityPeriod Years `
+    -ValidityPeriodUnits 20
+
+# Configuration CA Subordinate
+Install-AdcsCertificationAuthority `
+    -CAType EnterpriseSubordinateCA `
+    -ParentCA "RootCA-Server\Root CA Name" `
+    -KeyLength 2048 `
+    -ValidityPeriod Years `
+    -ValidityPeriodUnits 10
 ```
 
-### Gestion Templates
-1. **Dupliquer template** : `certtmpl.msc` → Duplicate template
-2. **Personnaliser** : Extensions, Key Usage, Subject Name
-3. **Publier** : `certsrv.msc` → Certificate Templates → New → Template to Issue
+### Templates Certificats
+```powershell
+# Commandes PowerShell utiles
+Get-CATemplate                          # Lister templates disponibles
+Get-CertificateTemplate                 # Templates AD
 
-### Templates Utiles
-| Template | Usage | Auto-enroll |
-|----------|-------|-------------|
-| **Web Server** | IIS, Apache | Non |
-| **Computer** | Auth machine | Oui (GPO) |
-| **User** | Auth utilisateur | Oui (GPO) |
-| **Code Signing** | Signature code | Non |
-| **IPSEC** | VPN/IPSEC | Oui |
+# Via interface graphique
+certtmpl.msc                           # Gestion templates
+certsrv.msc                            # Console CA
+```
 
-### Demande Certificats
-```bash
-# Via interface web
-https://ca-server/certsrv
+### Templates Standards
+| Template | Usage | Auto-Enroll | Key Usage |
+|----------|-------|-------------|-----------|
+| **Computer** | Auth machine | ✓ (GPO) | Client/Server Auth |
+| **User** | Auth utilisateur | ✓ (GPO) | Client Auth, Email |
+| **Web Server** | IIS/Apache | ✗ | Server Auth |
+| **Code Signing** | Signature code | ✗ | Code Signing |
+| **IPSec** | VPN/IPSec | ✓ | Client/Server Auth |
+| **Domain Controller** | DC Auth | ✓ | Client/Server Auth |
+| **Workstation** | Poste de travail | ✓ | Client Auth |
 
-# Via certreq (Windows)
+### Demande & Gestion Certificats
+```powershell
+# Demande via certreq
 certreq -submit -attrib "CertificateTemplate:WebServer" request.csr
 
-# Via MMC
-certlm.msc → Personal → Certificates → Request New Certificate
-```
+# Demande via PowerShell
+$Template = Get-CertificateTemplate -Name "WebServer"
+Get-Certificate -Template $Template -Url "ldap:" -CertStoreLocation Cert:\LocalMachine\My
 
-### Export/Import
-```powershell
-# Export PFX avec clé privée
-$pwd = ConvertTo-SecureString -String "password" -Force -AsPlainText
-Export-PfxCertificate -Cert "Cert:\LocalMachine\My\thumbprint" -FilePath cert.pfx -Password $pwd
+# Export certificat avec clé privée
+$cert = Get-ChildItem Cert:\LocalMachine\My | Where {$_.Subject -like "*domain.com*"}
+$pwd = ConvertTo-SecureString -String "P@ssw0rd" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $pwd
 
 # Import sur serveur distant
-$cred = Get-Credential
-Invoke-Command -ComputerName server01 -Credential $cred -ScriptBlock {
-    Import-PfxCertificate -FilePath "\\share\cert.pfx" -CertStoreLocation "Cert:\LocalMachine\My" -Password $using:pwd
+$session = New-PSSession -ComputerName "server01"
+Copy-Item cert.pfx -Destination C:\temp\ -ToSession $session
+Invoke-Command -Session $session -ScriptBlock {
+    Import-PfxCertificate -FilePath C:\temp\cert.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $using:pwd
 }
 ```
 
 ### Révocation & CRL
 ```bash
-# Révoquer certificat
-certutil -revoke serial_number reason_code
+# Administration CA
+certutil -revoke SerialNumber ReasonCode  # Révoquer certificat
+certutil -crl                             # Publier CRL
+certutil -getreg CA\CRLPublicationURLs    # URLs publication CRL
 
-# Publier CRL
-certutil -crl
+# Codes raison révocation
+# 0=Unspecified, 1=KeyCompromise, 2=CACompromise, 3=AffiliationChanged
+# 4=Superseded, 5=CessationOfOperation, 6=CertificateHold
 
-# Vérifier statut révocation
-certutil -verify -urlfetch cert.pem
+# Vérification statut
+certutil -verify -urlfetch cert.cer
+certutil -url cert.cer                    # Test URLs dans certificat
 ```
 
 ## 🤖 ACME & Let's Encrypt
 
-### Certbot (Debian/Ubuntu)
+### Certbot (Client Officiel)
 ```bash
-# Installation
-apt install certbot python3-certbot-apache
+# Installation Debian/Ubuntu
+apt install certbot python3-certbot-apache python3-certbot-nginx
 
-# Certificat standalone
+# Certificat standalone (port 80 libre)
 certbot certonly --standalone -d domain.com -d www.domain.com
 
-# Avec Apache
-certbot --apache -d domain.com
+# Avec webroot (serveur web actif)
+certbot certonly --webroot -w /var/www/html -d domain.com
 
-# Renouvellement auto
-echo "0 2 * * * root certbot renew --quiet" >> /etc/crontab
+# Intégration Apache/Nginx
+certbot --apache -d domain.com    # Configure automatiquement Apache
+certbot --nginx -d domain.com     # Configure automatiquement Nginx
+
+# Certificat wildcard (DNS challenge requis)
+certbot certonly --manual --preferred-challenges dns -d "*.domain.com"
+
+# Renouvellement automatique
+echo "0 2 * * * root certbot renew --quiet" > /etc/cron.d/certbot
+systemctl enable certbot.timer    # Sur systemd
 ```
 
-### acme.sh (Alternative)
+### acme.sh (Alternative Populaire)
 ```bash
 # Installation
-curl https://get.acme.sh | sh
+curl https://get.acme.sh | sh -s email=admin@domain.com
 
-# Certificat DNS challenge
-acme.sh --issue --dns dns_cloudflare -d domain.com -d *.domain.com
+# Certificat avec DNS API (ex: Cloudflare)
+export CF_Token="your-cloudflare-token"
+acme.sh --issue --dns dns_cf -d domain.com -d "*.domain.com"
 
-# Installation auto
+# Installation automatique
 acme.sh --install-cert -d domain.com \
-  --key-file /etc/ssl/private/domain.key \
-  --fullchain-file /etc/ssl/certs/domain.pem \
-  --reloadcmd "systemctl reload nginx"
+    --key-file /etc/ssl/private/domain.key \
+    --fullchain-file /etc/ssl/certs/domain.pem \
+    --reloadcmd "systemctl reload nginx"
+
+# Renouvellement (automatique via cron)
+acme.sh --cron
 ```
 
-### Validation Challenges
-- **HTTP-01** : `http://domain.com/.well-known/acme-challenge/`
-- **DNS-01** : TXT record `_acme-challenge.domain.com`
-- **TLS-ALPN-01** : TLS avec extension ALPN
+### Types de Validation ACME
+| Challenge | Port | Usage | Avantages | Limitations |
+|-----------|------|--------|-----------|-------------|
+| **HTTP-01** | 80 | Domain validation | Simple | Pas de wildcard |
+| **DNS-01** | 53 | DNS TXT record | Wildcard possible | API DNS requise |
+| **TLS-ALPN-01** | 443 | TLS extension | Pas de port 80 | Support limité |
 
-## 🔧 Déploiement & Configuration
+## 🌐 Configuration Serveurs Web
 
-### Apache/Nginx
+### Apache HTTPD
 ```apache
-# Apache VirtualHost
+# /etc/apache2/sites-available/domain-ssl.conf
 <VirtualHost *:443>
+    ServerName domain.com
+    DocumentRoot /var/www/html
+    
+    # SSL Configuration
     SSLEngine on
     SSLCertificateFile /etc/ssl/certs/domain.pem
     SSLCertificateKeyFile /etc/ssl/private/domain.key
     SSLCertificateChainFile /etc/ssl/certs/chain.pem
     
-    # Sécurité TLS
+    # Modern SSL configuration
     SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1
-    SSLCipherSuite ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS
+    SSLCipherSuite ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:!aNULL:!MD5:!DSS
     SSLHonorCipherOrder on
+    
+    # Security headers
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    
+    # OCSP Stapling
+    SSLUseStapling on
+    SSLStaplingCache shmcb:/var/run/apache2/stapling_cache(128000)
+</VirtualHost>
+
+# Force HTTPS redirect
+<VirtualHost *:80>
+    ServerName domain.com
+    Redirect permanent / https://domain.com/
 </VirtualHost>
 ```
 
+### Nginx
 ```nginx
-# Nginx Server Block
+# /etc/nginx/sites-available/domain
+server {
+    listen 80;
+    server_name domain.com www.domain.com;
+    return 301 https://$server_name$request_uri;
+}
+
 server {
     listen 443 ssl http2;
+    server_name domain.com www.domain.com;
+    
+    # SSL Configuration
     ssl_certificate /etc/ssl/certs/domain.pem;
     ssl_certificate_key /etc/ssl/private/domain.key;
+    ssl_trusted_certificate /etc/ssl/certs/chain.pem;
     
-    # Sécurité TLS
+    # Modern SSL configuration
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:!aNULL:!MD5:!DSS;
-    ssl_prefer_server_ciphers on;
+    ssl_prefer_server_ciphers off;  # TLS 1.3 compatibility
     
-    # HSTS
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # SSL session cache
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # OCSP stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
 }
 ```
 
 ### IIS (Windows)
 ```powershell
-# Importer certificat
-Import-PfxCertificate -FilePath cert.pfx -CertStoreLocation Cert:\LocalMachine\My
+# Import certificat
+Import-PfxCertificate -FilePath cert.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $pwd
 
-# Binding HTTPS
-New-WebBinding -Name "Default Web Site" -IPAddress "*" -Port 443 -Protocol https -SslFlags 0
+# Configuration site
+New-WebSite -Name "SecureSite" -Port 443 -Protocol https -PhysicalPath C:\inetpub\wwwroot
+$cert = Get-ChildItem Cert:\LocalMachine\My | Where {$_.Subject -like "*domain.com*"}
+New-WebBinding -Name "SecureSite" -Protocol https -Port 443 -SslFlags 1 -CertificateThumbprint $cert.Thumbprint
+
+# IIS SSL Settings (web.config)
+<system.webServer>
+    <rewrite>
+        <rules>
+            <rule name="Redirect to HTTPS" stopProcessing="true">
+                <match url=".*" />
+                <conditions>
+                    <add input="{HTTPS}" pattern="off" ignoreCase="true" />
+                </conditions>
+                <action type="Redirect" url="https://{HTTP_HOST}/{R:0}" redirectType="Permanent" />
+            </rule>
+        </rules>
+    </rewrite>
+</system.webServer>
 ```
 
-## 📋 Organisation Fichiers
+## 🛡️ Sécurité & Hardening
 
-### Structure Recommandée
+### Configuration TLS Sécurisée
+```bash
+# Test cipher suites
+nmap --script ssl-enum-ciphers -p 443 domain.com
+testssl.sh --fast domain.com
+
+# Configuration dhparam (si DHE utilisé)
+openssl dhparam -out /etc/ssl/dhparam.pem 2048
+
+# Vérification HSTS
+curl -I https://domain.com | grep -i strict-transport-security
+```
+
+### Monitoring Expiration
+```bash
+# Script surveillance certificats
+#!/bin/bash
+check_cert_expiry() {
+    local domain=$1
+    local days_warn=${2:-30}
+    
+    expiry_date=$(echo | openssl s_client -servername $domain -connect $domain:443 2>/dev/null | \
+                  openssl x509 -noout -enddate | cut -d= -f2)
+    expiry_epoch=$(date -d "$expiry_date" +%s)
+    current_epoch=$(date +%s)
+    days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
+    
+    if [ $days_until_expiry -lt $days_warn ]; then
+        echo "WARNING: $domain expires in $days_until_expiry days"
+        # Envoyer alerte mail/Slack/Teams
+    fi
+}
+
+check_cert_expiry "domain.com" 30
+```
+
+### Certificate Transparency
+```bash
+# Vérifier CT logs
+curl -s "https://crt.sh/?q=domain.com&output=json" | jq '.[].common_name' | sort -u
+
+# Monitoring nouveaux certificats
+curl -s "https://certspotter.com/api/v0/certs?domain=domain.com" | jq '.[]'
+```
+
+## 📋 Gestion & Organisation
+
+### Structure Fichiers
 ```
 /etc/ssl/
-├── certs/          # Certificats publics
-├── private/        # Clés privées (600)
-├── csr/           # Certificate Signing Requests
-├── ca-certificates/ # CA racines système
-└── backup/        # Sauvegardes chiffrées
+├── certs/                 # Certificats publics (644)
+│   ├── domain.pem
+│   └── ca-bundle.pem
+├── private/               # Clés privées (600, root:ssl-cert)
+│   └── domain.key
+├── csr/                   # Certificate requests
+│   └── domain.csr
+└── archive/               # Certificats expirés/révoqués
+    └── old-certs/
 ```
 
 ### Permissions & Sécurité
 ```bash
 # Permissions correctes
-chmod 644 /etc/ssl/certs/*.pem
-chmod 600 /etc/ssl/private/*.key
+chmod 644 /etc/ssl/certs/*
+chmod 600 /etc/ssl/private/*
 chown root:ssl-cert /etc/ssl/private/
+usermod -a -G ssl-cert nginx    # Ajouter nginx au groupe ssl-cert
 
+# Audit sécurité
+find /etc/ssl -type f -perm /o+r -path "*/private/*" -exec ls -la {} \;
+```
+
+### Sauvegarde & Restauration
+```bash
 # Sauvegarde chiffrée
-tar czf - /etc/ssl/ | openssl enc -aes-256-cbc -out ssl-backup.tar.gz.enc
+tar czf - /etc/ssl/ | gpg --cipher-algo AES256 --compress-algo 1 \
+    --symmetric --output ssl-backup-$(date +%Y%m%d).tar.gz.gpg
+
+# Inventaire certificats
+find /etc/ssl/certs -name "*.pem" -exec openssl x509 -in {} -noout -subject -enddate \; > cert-inventory.txt
 ```
 
-## 🛡️ Sécurité & Bonnes Pratiques
+## 🔍 Tests & Validation
 
-### Durcissement TLS
-- **Protocoles** : TLS 1.3 uniquement si possible, sinon TLS 1.2+
-- **Cipher Suites** : Forward Secrecy (ECDHE, DHE)
-- **HSTS** : `max-age=31536000; includeSubDomains; preload`
-- **OCSP Stapling** : Réduire latence validation
-
-### Monitoring & Alertes
+### Outils d'Audit SSL/TLS
 ```bash
-# Script surveillance expiration
-#!/bin/bash
-DAYS=30
-for cert in /etc/ssl/certs/*.pem; do
-    if openssl x509 -checkend $((DAYS*86400)) -noout -in "$cert"; then
-        echo "OK: $cert expires in >$DAYS days"
-    else
-        echo "WARNING: $cert expires in <$DAYS days" | mail -s "Cert Alert" admin@domain.com
-    fi
-done
+# SSL Labs API (automatisé)
+curl -s "https://api.ssllabs.com/api/v3/analyze?host=domain.com&publish=off&all=done" | \
+    jq '.endpoints[0].grade'
+
+# testssl.sh (audit complet)
+testssl.sh --jsonfile results.json domain.com
+
+# nmap SSL scripts
+nmap --script ssl-cert,ssl-enum-ciphers,ssl-heartbleed -p 443 domain.com
+
+# Vérification interne
+openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt cert.pem
 ```
 
-### Tests Sécurité
-```bash
-# Test SSL Labs
-curl -s "https://api.ssllabs.com/api/v3/analyze?host=domain.com" | jq .
+### Checklist Déploiement
+- [ ] **Certificat** : SAN inclut tous domaines/IPs nécessaires
+- [ ] **Chaîne** : Certificats intermédiaires inclus
+- [ ] **Clé** : Générée de manière sécurisée, permissions correctes
+- [ ] **TLS** : Version 1.2+ uniquement, cipher suites sécurisées
+- [ ] **HSTS** : Header configuré avec preload si possible
+- [ ] **OCSP** : Stapling activé pour performance
+- [ ] **Monitoring** : Alerte expiration configurée
+- [ ] **Sauvegarde** : Certificats et clés sauvegardés de manière chiffrée
+- [ ] **Tests** : Validation SSL/TLS via outils externes
 
-# Scan interne
-testssl.sh --fast domain.com:443
-
-# Vérification OCSP
-openssl s_client -connect domain.com:443 -status 2>/dev/null | grep -A 17 "OCSP response"
-```
-
-## 🚀 Automatisation & Scripts
-
-### Script Renouvellement
-```bash
-#!/bin/bash
-# renew-certs.sh
-DOMAIN="domain.com"
-CERT_PATH="/etc/ssl/certs"
-KEY_PATH="/etc/ssl/private"
-
-# Vérifier expiration
-if openssl x509 -checkend 2592000 -noout -in "$CERT_PATH/$DOMAIN.pem"; then
-    echo "Certificate still valid for 30+ days"
-    exit 0
-fi
-
-# Renouveler avec ACME
-acme.sh --renew -d "$DOMAIN" --force
-
-# Redémarrer services
-systemctl reload nginx
-systemctl reload apache2
-
-echo "Certificate renewed for $DOMAIN"
-```
-
-### PowerShell AD CS
-```powershell
-# Auto-enrollment via GPO
-$Template = "WebServer"
-$Subject = "CN=server.domain.com"
-
-$Request = New-Object -ComObject CertificateAuthority.Request
-$Request.Submit(1, $Subject, $Template, "")
-```
+---
+**💡 Memo** : ECDSA > RSA pour nouveaux déploiements • TLS 1.3 uniquement si possible • HSTS + preload recommandé !
 

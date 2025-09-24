@@ -210,6 +210,11 @@ Formation équipes
 - [ ] Tester efficacité
 - [ ] Mettre à jour procédures
 
----
-**📅 Dernière mise à jour** : Version courante  
-**🔗 Références** : NIST, OWASP, SANS, MITRE ATT&CK
+### Audit Sécurité Annuel
+- [ ] Scanner vulnérabilités
+- [ ] Revue configurations (firewall, IAM)
+- [ ] Vérifier journaux critiques
+- [ ] Audit accès privilégiés
+- [ ] Tester plans PCA/PRA
+- [ ] Évaluer sensibilisation utilisateurs
+- [ ] Rapport + plan d'action

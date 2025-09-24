@@ -1,142 +1,379 @@
-# Éditeurs (vim / nano) — résumé pratique
+# 📝 Éditeurs Linux — Aide-mémoire
 
-## Vim (essentiel)
+## 🧠 Concepts Éditeurs
 
-`vimtutor` pour apprendre VIM.
+### Philosophie Unix
+- **Vi/Vim** : Modal, puissant, courbe d'apprentissage élevée
+- **Nano** : WYSIWYG, simple, débutant-friendly
+- **Emacs** : Extensible, environnement complet
+- **Ed/Sed** : Ligne de commande, scripts automatisés
 
-### Options cmdline
-- -R : ouvre le fichier en lecture seule (pratique pour ne pas modifier accidentellement un fichier système).
-- +n : ouvre le fichier directement à la ligne n (ex : +42 va à la ligne 42).
-- +/motif : ouvre le fichier en positionnant le curseur sur la première occurrence du mot ou motif recherché.
-- ouvrir plusieurs fichiers d’un coup (ex : vim fichier1.txt fichier2.txt) et naviguer entre eux avec :n (suivant) ou :prev (précédent).
+### Modes d'Édition
+| Type | Exemple | Caractéristique |
+|------|---------|-----------------|
+| **Modal** | Vim, Vi | Modes séparés (navigation/insertion) |
+| **Non-modal** | Nano, Emacs | Insertion directe + raccourcis |
+| **Stream** | Sed, Awk | Traitement flux de données |
 
+## 🎯 Vim — Éditeur Modal
 
-| Mode              | Fonction principale                       | Pour y accéder                            |
-|-------------------|-------------------------------------------|-------------------------------------------|
-| Mode normal       | Navigation, suppression, copier/coller…   | Par défaut ou avec Échap                  |
-| Mode insertion    | Écriture de texte                         | i, a, o, O                                |
-| Mode visuel       | Sélection de texte                        | v (caractères), V (lignes), Ctrl+v (bloc) |
-| Ligne de commande | Commandes comme :w, :q, :set number, etc. | Touche deux-points :                      |
-
-### Déplacements
-- h, j, k, l : gauche, bas, haut, droite
-- 0 : début de la ligne
-- ^ : début du premier mot de la ligne
-- $ : fin de la ligne (fin de fichier?)
-- w : début du mot ou ponctuation suivant
-- b : début du mot ou ponctuation précédent
-- e : fin du mot ou ponctuation suivant
-- gg : tout début du fichier
-- G : dernière ligne du fichier
-- :n : va à la ligne numéro n
-
-
-### Enregistrer/quitter
-- :w : enregistre les modifications
-- :wq : enregistre et quitte
-- :wq! : enregistre et quitte, même si normalement c’est en lecture seule
-- :x : enregistre si besoin et quitte
-- :q : quitte sans enregistrer (si aucun changement)
-- :q! : quitte en forçant, sans sauvegarder
-
-### Modifications
-
-#### Supprimer/Couper
-- x : supprime un caractère sous le curseur
-- dw : supprime un mot (à partir du curseur)
-- dd : supprime la ligne entière
-
-#### Copier
-- yy : copie la ligne actuelle
-- yw : copie un mot (à partir du curseur)
-
-#### Coller
-- p : colle après le curseur
-- P : colle avant le curseur
-
-#### Remplacer
-
-| Commande | Action                                | Passe en insertion ?       |
-|----------|---------------------------------------|----------------------------|
-| r        | Remplace 1 caractère                  | ❌ (juste une lettre tapée) |
-| R        | Mode remplacement (texte tapé écrase) | ✅                          |
-| cl       | Supprime 1 caractère et insertion     | ✅                          |
-| cw       | Supprime 1 mot et insertion           | ✅                          |
-| cc       | Supprime la ligne et insertion        | ✅                          |
-
-### Actions multiplexés / Registres
-
-5yy : copie 5 lignes à partir de la ligne actuelle
-"ayy : copie la ligne dans le tampon a (a-z)
-"ap : colle le contenu du tampon a (a-z)
-Astuce : Copier plusieurs lignes dans un tampon : 5"ayy
-
-### Rechercher :
-`/mot` → `n`/`N`.  
-
-### Pouvoir de G
-
-#### Supprimer
-- :g/motif/d → supprime toutes les lignes contenant motif
-- :15,17 g/erreur/d → supprime les lignes 15 à 17 contenant "erreur"
-
-#### Déplacer
-- :1,20 g/alerte/m 50 → déplace toutes les lignes contenant "alerte" vers la ligne 50
-
-#### Remplacer
-- :30,45 g/demi-dieu/s/Héraclès/Achille/g → dans les lignes 30 à 45, si "demi-dieu" est présent, remplace tous les "Héraclès" par "Achille"
-- :g/Nantes/s//Rennes/g → sur tout le fichier, dans chaque ligne contenant "Nantes", remplace "Nantes" par "Rennes"
-- :g/Niort/s/^#// → supprime les débuts de ligne commençant par # dans les lignes contenant "Niort" (remplacement par rien)
-
-### Options et personnalisation
-
-#### Options via mode commande
-- `:set all` > Affiche toutes les options existantes
-- `:set` > Affiche les options actives sur la session
-- `:set option?` > Affiche la valeur actuelle d’une option précise.
-- `:help` ou `:h` ou `:help option` > Affiche l'aide de VIM
-- `:set fileformat` > Affiche le format de fin de ligne actuellement utilisé (unix, dos ou mac)
-- `:colorscheme` > Voir les thèmes dispo
-- `:colorscheme` > desert Appliquer un thème
-	- Tu peux aussi télécharger des thèmes personnalisés et les placer dans ~/.vim/colors
-
-#### Personnalisation
-Fichier de config à créer ou éditer : vim ~/.vimrc
-
-- `set expandtab` > Transforme les tabulations en espaces
-- `set autoindent` > Active l’indentation automatique à chaque nouvelle ligne
-- `set nocompatible` > Active les déplacements et fonctions Linux de VIM
-- `set showmode` > Affiche dans la barre du bas le mode actif
-- `set number` > Affiche les numéros de ligne.
-- `set tabstop=4` > Définit la largeur d’une tabulation à 4 espaces
-- `syntax on` > Active la coloration syntaxique selon le langage détecté
-- `set fileformat` > Affiche le format de fin de ligne actuellement utilisé (unix, dos ou mac)
-- `set fileformat={unix|dos}` > Force les fins de ligne au format Linux (LF)
-- `colorscheme nomtheme` > Appliquer un thème permanent
-
-#### Config copier/coller via souris post debian 9
-Dans /etc/vim/vimrc.local :
-
+### Démarrage & Options
 ```bash
-source /usr/share/vim/vimXX/defaults.vim ➜ récupère les réglages par défaut système
-let skip_defaults_vim = 1 ➜ empêche le rechargement en double
-if has('mouse') set mouse=r endif ➜ évite que la souris bascule en Visual Mode
-set paste ➜ désactive l’auto-indent lors du collage (nickel pour les blocs)
+# Ouverture fichiers
+vim fichier.txt              # Édition standard
+vim +42 fichier.txt          # Aller ligne 42
+vim +/pattern fichier.txt    # Aller première occurrence
+vim -R fichier.txt           # Mode lecture seule
+vim -o file1 file2           # Split horizontal
+vim -O file1 file2           # Split vertical
+
+# Récupération après crash
+vim -r fichier.txt           # Récupérer .swp
+vim -r                       # Lister fichiers récupérables
+
+# Apprentissage
+vimtutor                     # Tutoriel interactif (30min)
 ```
 
-- Le chemin /usr/share/vim/vimXX/ dépend de ta version de Vim (`vim --version`).
+### Modes Fondamentaux
+| Mode | Activation | Usage | Sortie |
+|------|------------|-------|--------|
+| **Normal** | `Esc` | Navigation, commandes | Mode par défaut |
+| **Insertion** | `i`, `a`, `o` | Saisie texte | `Esc` |
+| **Visuel** | `v`, `V`, `Ctrl+v` | Sélection | `Esc` |
+| **Commande** | `:` | Ex-commandes | `Esc` ou `Enter` |
+| **Recherche** | `/`, `?` | Recherche | `Esc` ou `Enter` |
 
-## Nano (rapide)
-- `nano fichier` → éditeur simple.  
-- Ctrl+O = sauvegarder,
-- Ctrl+X = quitter,
-- Ctrl+K = couper,
-- Ctrl+U = coller,
-- Ctrl+W = recherche,
-- Ctrl + \ : Remplacer.
+### Navigation Efficace
+```vim
+" Déplacements de base
+h j k l                      " Gauche, bas, haut, droite
+0 ^ $                        " Début ligne, premier mot, fin ligne
+w b e                        " Mot suivant, précédent, fin mot
+W B E                        " Mot large (ignore ponctuation)
 
-## Conversion CRLF/LF
-- `dos2unix` / `unix2dos`.
-- Via sed : 
-	- `sed 's/\r$//'` → Supprimer les caractères \r (passer de Windows à Linux)
-	- `sed 's/$/\r/'` → Ajouter des \r en fin de ligne (passer de Linux à Windows)
+" Saut de ligne
+gg G                         " Début/fin fichier  
+42G :42                      " Ligne 42
+42gg                         # Alternative ligne 42
+
+" Navigation écran
+Ctrl+f Ctrl+b               " Page suivante/précédente
+Ctrl+d Ctrl+u               " Demi-page bas/haut
+Ctrl+e Ctrl+y               " Scroll ligne par ligne
+H M L                       " Haut/milieu/bas écran
+zz zt zb                    " Centrer/haut/bas curseur
+```
+
+### Insertion & Édition
+```vim
+" Modes d'insertion
+i a                         " Insérer avant/après curseur
+I A                         " Début/fin de ligne
+o O                         " Nouvelle ligne bas/haut
+s S                         " Substituer caractère/ligne
+
+" Suppression
+x X                         " Caractère sous/avant curseur
+dw db dd                    " Mot suivant/précédent/ligne
+d$ d0                       " Fin/début ligne
+5dd                         " 5 lignes
+
+" Modification
+r R                         " Remplacer 1 car/mode remplace
+cw cb cc                    " Changer mot/mot préc./ligne
+C c$                        " Changer jusqu'à fin ligne
+~ u U                       " Changer casse/undo/undo ligne
+```
+
+### Copier-Coller & Registres
+```vim
+" Copie standard
+yy Y                        " Copier ligne
+yw yb                       " Copier mot suivant/précédent
+y$ y0                       " Copier jusqu'à fin/début ligne
+5yy                         " Copier 5 lignes
+
+" Collage
+p P                         " Coller après/avant curseur
+
+" Registres nommés (a-z)
+"ayy                        " Copier ligne dans registre a
+"ap                         " Coller depuis registre a
+"Ayy                        " Ajouter ligne au registre a
+
+" Registres spéciaux
+""                          " Registre par défaut
+"0                          " Dernière copie (yank)
+"1-"9                       " Historique suppressions
+"+                          " Presse-papier système
+"*                          " Sélection souris (Linux)
+```
+
+### Recherche & Remplacement
+```vim
+" Recherche
+/pattern                    " Recherche avant
+?pattern                    " Recherche arrière
+n N                         " Occurrence suivante/précédente
+* #                         " Mot sous curseur avant/arrière
+
+" Options recherche
+:set ignorecase             " Ignorer casse
+:set smartcase              " Casse intelligente
+:set hlsearch               " Surligner résultats
+:nohlsearch                 " Supprimer surlignage
+
+" Remplacement
+:s/old/new/                 " Première occurrence ligne
+:s/old/new/g                " Toutes occurrences ligne
+:%s/old/new/g               " Tout le fichier
+:%s/old/new/gc              " Avec confirmation
+:15,25s/old/new/g           " Lignes 15 à 25
+```
+
+### Commandes Globales (:g)
+```vim
+" Syntaxe: :g/pattern/command
+:g/ERROR/d                  " Supprimer lignes avec ERROR
+:g/TODO/m$                  " Déplacer TODOs à la fin
+:g/DEBUG/s//INFO/g          " Remplacer DEBUG par INFO
+:v/pattern/d                " Supprimer lignes SANS pattern
+
+" Avec plages
+:1,50g/function/p           " Afficher lignes avec 'function'
+:g/class/+2d                " Supprimer ligne + 2 suivantes
+```
+
+### Gestion Fichiers & Buffers
+```vim
+" Sauvegarde & sortie
+:w                          " Sauvegarder
+:w filename                 " Sauvegarder sous
+:wq :x ZZ                   " Sauvegarder et quitter
+:q :q!                      " Quitter (avec/sans sauvegarde)
+
+" Buffers multiples
+:e filename                 " Ouvrir fichier
+:b1 :b2                     " Basculer buffer 1/2
+:bn :bp                     " Buffer suivant/précédent
+:bd                         " Fermer buffer
+:ls :buffers                " Lister buffers
+
+" Splits
+:split :sp                  " Split horizontal
+:vsplit :vsp                " Split vertical
+Ctrl+w h/j/k/l              " Naviguer entre splits
+Ctrl+w +/-                  " Redimensionner
+Ctrl+w =                    " Égaliser tailles
+```
+
+### Configuration & Personnalisation
+```vim
+" Configuration session (~/.vimrc pour permanent)
+:set number                 " Numérotation lignes
+:set relativenumber         " Numérotation relative
+:set expandtab              " Espaces au lieu de tabs
+:set tabstop=4              " Largeur tabulation
+:set shiftwidth=4           " Largeur indentation
+:set autoindent             " Indentation automatique
+:syntax on                  " Coloration syntaxique
+
+" Exemple ~/.vimrc minimal
+set nocompatible            " Mode Vim (pas Vi)
+set number                  " Numéros de ligne
+set expandtab               " Espaces pour tabs
+set tabstop=4 shiftwidth=4  " Indentation 4 espaces
+set autoindent smartindent  " Indentation intelligente
+syntax on                   " Coloration
+set hlsearch incsearch      " Recherche améliorée
+set mouse=a                 " Support souris
+```
+
+### Macros & Automatisation
+```vim
+" Enregistrement macro
+qa                          " Commencer macro dans registre a
+[commandes...]              " Séquence d'actions
+q                           " Arrêter enregistrement
+
+" Exécution macro
+@a                          " Exécuter macro a
+5@a                         " Exécuter 5 fois
+@@                          " Répéter dernière macro
+```
+
+## 🌱 Nano — Éditeur Simple
+
+### Interface & Navigation
+```bash
+# Démarrage
+nano fichier.txt            # Édition standard
+nano +42 fichier.txt        # Aller ligne 42
+nano -R fichier.txt         # Mode lecture seule
+nano -w fichier.txt         # Désactiver word wrap
+nano -T 4 fichier.txt       # Tabs = 4 espaces
+```
+
+### Raccourcis Essentiels
+| Raccourci | Action | Description |
+|-----------|--------|-------------|
+| `Ctrl+O` | WriteOut | Sauvegarder fichier |
+| `Ctrl+X` | Exit | Quitter (demande sauvegarde si modifié) |
+| `Ctrl+R` | Read File | Insérer contenu autre fichier |
+| `Ctrl+W` | Where Is | Rechercher texte |
+| `Ctrl+\` | Replace | Rechercher et remplacer |
+| `Ctrl+K` | Cut | Couper ligne entière |
+| `Ctrl+U` | Uncut | Coller lignes coupées |
+| `Ctrl+G` | Help | Aide contextuelle |
+
+### Navigation Avancée
+```bash
+# Déplacement
+Ctrl+A / Ctrl+E            # Début/fin de ligne
+Ctrl+Y / Ctrl+V            # Page précédente/suivante  
+Ctrl+_ (Ctrl+Shift+-)      # Aller à ligne X
+Alt+\ (Alt+|)              # Aller début/fin fichier
+Ctrl+C                     # Position curseur actuelle
+
+# Sélection & édition
+Alt+A                      # Marquer début sélection
+Alt+6                      # Copier sélection
+Ctrl+K                     # Couper ligne/sélection
+Ctrl+U                     # Coller
+```
+
+### Configuration Nano
+```bash
+# Fichier ~/.nanorc
+set tabsize 4               # Taille tabulations
+set tabstospaces            # Convertir tabs en espaces
+set autoindent              # Indentation automatique
+set linenumbers             # Numéros de ligne
+set mouse                   # Support souris
+set softwrap                # Retour ligne doux
+set smooth                  # Scroll doux
+
+# Coloration syntaxique
+include "/usr/share/nano/*.nanorc"
+```
+
+## 🔄 Conversion Formats
+
+### Fin de Lignes (CRLF/LF)
+| Système | Format | Caractères |
+|---------|--------|------------|
+| **Unix/Linux** | LF | `\n` |
+| **Windows** | CRLF | `\r\n` |  
+| **Mac Classic** | CR | `\r` |
+
+### Outils Conversion
+```bash
+# dos2unix / unix2dos
+dos2unix fichier.txt        # Windows → Unix
+unix2dos fichier.txt        # Unix → Windows
+dos2unix -k fichier.txt     # Garder timestamp
+
+# Avec sed
+sed 's/\r$//' file.txt      # Supprimer \r (Win → Unix)
+sed 's/$/\r/' file.txt      # Ajouter \r (Unix → Win)
+
+# Vérifier format
+file fichier.txt            # Indique type fin de ligne
+od -c fichier.txt | head    # Visualiser caractères spéciaux
+
+# Dans Vim
+:set fileformat=unix        # Forcer format Unix
+:set fileformat=dos         # Forcer format Windows
+:set fileformat?            # Voir format actuel
+```
+
+### Encodages Caractères
+```bash
+# Détecter encodage
+file -bi fichier.txt        # Avec libmagic
+chardet fichier.txt         # Python chardet
+
+# Convertir avec iconv
+iconv -f ISO-8859-1 -t UTF-8 input.txt > output.txt
+iconv -l                    # Lister encodages disponibles
+
+# Dans Vim
+:set encoding=utf-8         # Encodage interne Vim
+:set fileencoding=utf-8     # Encodage fichier
+:e ++enc=latin1 fichier.txt # Ouvrir avec encodage spécifique
+```
+
+## 🚀 Éditeurs Avancés
+
+### Emacs (Concepts)
+```bash
+# Raccourcis de base (Ctrl = C-, Meta/Alt = M-)
+C-x C-f                     # Ouvrir fichier
+C-x C-s                     # Sauvegarder
+C-x C-c                     # Quitter
+C-g                         # Annuler commande
+C-x u                       # Undo
+C-space                     # Marquer début sélection
+```
+
+### Ed (Éditeur Ligne)
+```bash
+# Éditeur scriptable primitif
+ed fichier.txt
+a                           # Mode ajout
+.                           # Fin mode ajout
+1,5p                        # Afficher lignes 1-5
+s/old/new/g                 # Remplacer sur ligne courante
+w                           # Sauvegarder
+q                           # Quitter
+```
+
+## 🎯 Comparaison Éditeurs
+
+### Choix selon Contexte
+| Situation | Éditeur Recommandé | Raison |
+|-----------|-------------------|--------|
+| **SSH distant/limité** | Vi/Vim | Toujours disponible |
+| **Débutant** | Nano | Interface intuitive |
+| **Script/automatisation** | Sed/Awk | Traitement batch |
+| **Développement** | Vim/Emacs/VSCode | Fonctions avancées |
+| **Configuration rapide** | Nano | Modification simple |
+| **Fichiers volumineux** | Vim | Performance |
+
+### Performance & Mémoire
+- **Vi/Vim** : Rapide, léger, modal
+- **Nano** : Simple, mémoire raisonnable
+- **Emacs** : Lourd mais très extensible
+- **VSCode/Atom** : Interface moderne, consommation élevée
+
+## 💡 Bonnes Pratiques
+
+### Sécurité Édition
+- ✅ **Sauvegarde** avant modification fichiers système
+- ✅ **Permissions** : vérifier droits écriture
+- ✅ **Sudo** : éditer avec privilèges si nécessaire
+- ✅ **Verrouillage** : attention aux .swp (Vim)
+
+### Efficacité
+- ✅ **Raccourcis** : apprendre progressivement
+- ✅ **Configuration** : personnaliser selon usage
+- ✅ **Cohérence** : choisir éditeur principal et s'y tenir
+- ✅ **Backup** : copier fichiers critiques avant édition
+
+### Dépannage Vim
+```bash
+# Problèmes courants
+:set paste                  # Désactiver auto-indent pour coller
+:set nopaste                # Réactiver auto-indent
+:syntax off                 # Désactiver coloration (performance)
+:set nocompatible           # Mode Vim complet
+
+# Récupération fichiers
+vim -r                      # Lister fichiers récupérables
+ls -la .*.swp               # Voir fichiers .swp
+rm .filename.swp            # Supprimer si récupération OK
+```
+
+---
+**💡 Memo** : `vimtutor` pour apprendre, `Ctrl+G` dans nano pour aide, toujours sauvegarder avant gros changements !

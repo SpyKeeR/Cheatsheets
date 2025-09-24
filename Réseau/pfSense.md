@@ -526,6 +526,3 @@ openssl x509 -in /tmp/cert.pem -text -noout
 - Documentation mise à jour
 - Formation équipe
 ```
-
----
-**💡 Ressources** : [pfSense Docs](https://docs.netgate.com/pfsense/) • [Netgate Forum](https://forum.netgate.com/) • [pfSense Book](https://www.netgate.com/resources/pfsense-book)
